@@ -27,3 +27,8 @@ out/
 .idea/
 .vscode/
 .DS_Store
+*.iml
+.gemini/
+
+# Data
+dataset/
