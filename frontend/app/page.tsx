@@ -171,8 +171,6 @@ export default function HomePage() {
               <span className="font-semibold text-lg text-zinc-200 tracking-wide">Identify Dog</span>
             </Link>
           </div>
-
-          </div>
         </>
       )}
     </div>
