@@ -14,6 +14,7 @@ export default function CameraCapture({ onCapture, isScanning = false }: CameraC
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<'camera' | 'upload'>('camera')
+  const [flash, setFlash] = useState(false)
   
   const startCamera = useCallback(async () => {
     try {
@@ -69,7 +70,11 @@ export default function CameraCapture({ onCapture, isScanning = false }: CameraC
     }
 
     canvas.toBlob((blob) => {
-      if (blob) onCapture(blob)
+      if (blob) {
+        setFlash(true)
+        setTimeout(() => setFlash(false), 150)
+        onCapture(blob)
+      }
     }, 'image/jpeg', 0.9)
   }, [mode, onCapture, isScanning])
 
@@ -110,6 +115,11 @@ export default function CameraCapture({ onCapture, isScanning = false }: CameraC
         />
       )}
       <canvas ref={canvasRef} className="hidden" />
+      
+      {/* Flash Effect */}
+      {flash && (
+        <div className="absolute inset-0 bg-white z-40 transition-opacity duration-150 animate-out fade-out"></div>
+      )}
       
       {/* Cinematic HUD Overlay */}
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">

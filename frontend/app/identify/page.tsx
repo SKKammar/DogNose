@@ -1,7 +1,7 @@
 'use client'
 import React, { useState } from 'react'
 import CameraCapture from '../components/CameraCapture'
-import { Loader2, AlertTriangle, Fingerprint } from 'lucide-react'
+import { Loader2, AlertTriangle, Fingerprint, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
@@ -63,7 +63,11 @@ export default function IdentifyPage() {
       }
     } catch (err: any) {
       clearTimeout(wakeTimer)
-      setError(err.message)
+      if (err.name === 'TypeError' || err.message === 'Failed to fetch') {
+        setError("Network error: Could not reach the server. Please check your connection or CORS settings.")
+      } else {
+        setError(err.message)
+      }
       setStatus('error')
     }
   }
@@ -83,8 +87,14 @@ export default function IdentifyPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="w-full"
+            className="w-full max-w-md"
           >
+            <div className="flex justify-between items-center mb-6">
+              <Link href="/" className="flex items-center text-zinc-400 hover:text-white transition">
+                <ChevronLeft size={20} className="mr-1" />
+                <span className="text-sm font-medium">Back to Home</span>
+              </Link>
+            </div>
             <p className="text-center text-zinc-400 mb-8 font-light">Align the nose securely within the targeting frame.</p>
             <CameraCapture onCapture={handleCapture} />
           </motion.div>

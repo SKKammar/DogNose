@@ -43,6 +43,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
+logger.info(f"CORS setup with allowed_origins: {allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,

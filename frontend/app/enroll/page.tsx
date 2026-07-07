@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import CameraCapture from '../components/CameraCapture'
-import { Loader2, AlertTriangle, CheckCircle2, Fingerprint } from 'lucide-react'
+import { Loader2, AlertTriangle, CheckCircle2, Fingerprint, X, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
@@ -17,6 +17,7 @@ export default function EnrollPage() {
   const [name, setName] = useState('')
   const [breed, setBreed] = useState('')
   const [error, setError] = useState('')
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const router = useRouter()
@@ -29,18 +30,21 @@ export default function EnrollPage() {
   }, [])
 
   const handleCapture = (blob: Blob) => {
-    const newBlobs = [...capturedBlobs, blob]
-    setCapturedBlobs(newBlobs)
-    if (newBlobs.length === 3) {
-      setStep('details')
+    if (capturedBlobs.length < 5) {
+      setCapturedBlobs([...capturedBlobs, blob])
     }
+  }
+
+  const removeBlob = (index: number) => {
+    setCapturedBlobs(capturedBlobs.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (capturedBlobs.length < 3 || !name) return
+    if (capturedBlobs.length < 1 || !name) return
     
     setStep('uploading')
+    setUploadProgress(0)
     setError('')
 
     try {
@@ -64,6 +68,7 @@ export default function EnrollPage() {
 
       // 2. Upload nose print embedding for each blob
       for (let i = 0; i < capturedBlobs.length; i++) {
+        setUploadProgress(i + 1)
         const formData = new FormData()
         formData.append('file', capturedBlobs[i], `nose_${i}.jpg`)
 
@@ -83,7 +88,11 @@ export default function EnrollPage() {
 
       setStep('success')
     } catch (err: any) {
-      setError(err.message)
+      if (err.name === 'TypeError' || err.message === 'Failed to fetch') {
+        setError("Network error: Could not reach the server. Please check your connection or CORS settings.")
+      } else {
+        setError(err.message)
+      }
       setStep('error')
     }
   }
@@ -136,9 +145,43 @@ export default function EnrollPage() {
       
       <AnimatePresence mode="wait">
         {step === 'capture' && (
-          <motion.div key="capture" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full">
-            <p className="text-center text-zinc-400 mb-8 font-light">Capture a sharp, well-lit photo of the dog's nose to register their biometric signature. ({capturedBlobs.length + 1} of 3)</p>
+          <motion.div key="capture" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full max-w-md">
+            <div className="flex justify-between items-center mb-6">
+              <Link href="/" className="flex items-center text-zinc-400 hover:text-white transition">
+                <ChevronLeft size={20} className="mr-1" />
+                <span className="text-sm font-medium">Back to Home</span>
+              </Link>
+            </div>
+            <p className="text-center text-zinc-400 mb-8 font-light">Capture clear photos of the dog's nose (up to 5).</p>
             <CameraCapture onCapture={handleCapture} />
+            
+            {capturedBlobs.length > 0 && (
+              <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-zinc-300 text-sm font-medium">Captured Photos</h3>
+                  <span className="text-xs font-medium px-2 py-1 bg-zinc-800 text-zinc-400 rounded-full">{capturedBlobs.length} / 5</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
+                  {capturedBlobs.map((blob, idx) => (
+                    <div key={idx} className="relative w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-zinc-700 snap-center shadow-lg">
+                      <img src={URL.createObjectURL(blob)} className="w-full h-full object-cover" />
+                      <button 
+                        onClick={() => removeBlob(idx)}
+                        className="absolute top-1 right-1 w-6 h-6 bg-red-500/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500 transition"
+                      >
+                        <X size={14} className="text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  onClick={() => setStep('details')}
+                  className="w-full py-4 mt-2 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition shadow-[0_0_15px_rgba(37,99,235,0.3)] flex justify-center items-center gap-2"
+                >
+                  Continue to Details <CheckCircle2 size={18} />
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -170,7 +213,11 @@ export default function EnrollPage() {
           <motion.div key="uploading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center py-32 w-full max-w-md">
             <Loader2 className="animate-spin text-blue-500 mb-4" size={48} />
             <h2 className="text-xl font-light text-zinc-200">SECURING DATA</h2>
-            <p className="text-zinc-500 text-sm mt-2">Encrypting embedding and saving profile...</p>
+            <p className="text-zinc-500 text-sm mt-2">
+              {uploadProgress > 0 
+                ? `Uploading photo ${uploadProgress} of ${capturedBlobs.length}...` 
+                : "Encrypting embedding and saving profile..."}
+            </p>
           </motion.div>
         )}
 
