@@ -6,8 +6,9 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
-import { API_URL } from '../../lib/api'
+import { API_URL, fetchWithErrorHandling, ApiError } from '../../lib/api'
 import AppHeader from '../components/AppHeader'
+import NetworkError from '../components/NetworkError'
 
 type IdentifyStatus = 'idle' | 'processing' | 'match' | 'no_match' | 'error'
 
@@ -19,7 +20,7 @@ interface MatchResult {
 export default function IdentifyPage() {
   const [status, setStatus] = useState<IdentifyStatus>('idle')
   const [result, setResult] = useState<MatchResult | null>(null)
-  const [error, setError] = useState<string>('')
+  const [error, setError] = useState<ApiError | null>(null)
   const [isWaking, setIsWaking] = useState(false)
 
   const router = useRouter()
@@ -33,25 +34,12 @@ export default function IdentifyPage() {
       const formData = new FormData()
       formData.append('file', blob, 'nose.jpg')
 
-      const res = await fetch(`${API_URL}/dogs/identify`, {
+      const res = await fetchWithErrorHandling(`${API_URL}/dogs/identify`, {
         method: 'POST',
         body: formData
       })
       
       clearTimeout(wakeTimer)
-      
-      if (!res.ok) {
-        if (res.status === 503) {
-          throw new Error("Server cold-start: waking up the matching engine, one moment...")
-        }
-        
-        // Attempt to parse explicit validation errors (e.g. from the detector)
-        const errorData = await res.json().catch(() => null)
-        if (errorData && errorData.detail) {
-          throw new Error(errorData.detail)
-        }
-        throw new Error('Failed to identify')
-      }
       
       const data = await res.json()
       
@@ -63,11 +51,7 @@ export default function IdentifyPage() {
       }
     } catch (err: any) {
       clearTimeout(wakeTimer)
-      if (err.name === 'TypeError' || err.message === 'Failed to fetch') {
-        setError("Network error: Could not reach the server. Please check your connection or CORS settings.")
-      } else {
-        setError(err.message)
-      }
+      setError(err)
       setStatus('error')
     }
   }
@@ -219,20 +203,16 @@ export default function IdentifyPage() {
           </motion.div>
         )}
         
-        {status === 'error' && (
+        {status === 'error' && error && (
           <motion.div 
             key="error"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="text-center py-20 w-full max-w-md bg-red-500/10 border border-red-500/20 rounded-3xl p-8"
+            className="w-full flex justify-center pb-20"
           >
-            <AlertTriangle size={48} className="mx-auto mb-4 text-red-500" strokeWidth={1.5} />
-            <p className="text-zinc-300 mb-6 font-light leading-relaxed">{error}</p>
-            <button 
-              onClick={() => setStatus('idle')} 
-              className="py-3 px-8 bg-zinc-900 text-white rounded-full font-medium hover:bg-zinc-800 border border-white/10"
-            >
-              Reset System
-            </button>
+            <NetworkError 
+              error={error} 
+              onRetry={async () => setStatus('idle')} 
+            />
           </motion.div>
         )}
       </AnimatePresence>

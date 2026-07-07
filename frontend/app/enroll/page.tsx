@@ -6,8 +6,9 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
-import { API_URL } from '../../lib/api'
+import { API_URL, fetchWithErrorHandling, ApiError } from '../../lib/api'
 import AppHeader from '../components/AppHeader'
+import NetworkError from '../components/NetworkError'
 
 type EnrollStep = 'capture' | 'details' | 'uploading' | 'success' | 'error'
 
@@ -16,7 +17,7 @@ export default function EnrollPage() {
   const [capturedBlobs, setCapturedBlobs] = useState<Blob[]>([])
   const [name, setName] = useState('')
   const [breed, setBreed] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState<ApiError | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -50,11 +51,11 @@ export default function EnrollPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        throw new Error("Session expired. Please sign in again.")
+        throw { type: 'server', message: "Session expired. Please sign in again." }
       }
 
       // 1. Create dog profile
-      const dogRes = await fetch(`${API_URL}/dogs`, {
+      const dogRes = await fetchWithErrorHandling(`${API_URL}/dogs`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -63,7 +64,6 @@ export default function EnrollPage() {
         body: JSON.stringify({ name, breed })
       })
       
-      if (!dogRes.ok) throw new Error("Failed to register dog profile")
       const dogData = await dogRes.json()
 
       // 2. Upload nose print embedding for each blob
@@ -72,27 +72,18 @@ export default function EnrollPage() {
         const formData = new FormData()
         formData.append('file', capturedBlobs[i], `nose_${i}.jpg`)
 
-        const enrollRes = await fetch(`${API_URL}/dogs/${dogData.id}/enroll`, {
+        await fetchWithErrorHandling(`${API_URL}/dogs/${dogData.id}/enroll`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`
           },
           body: formData
         })
-
-        if (!enrollRes.ok) {
-          const errData = await enrollRes.json().catch(() => null)
-          throw new Error(errData?.detail || `Failed to extract and store nose print (photo ${i+1})`)
-        }
       }
 
       setStep('success')
     } catch (err: any) {
-      if (err.name === 'TypeError' || err.message === 'Failed to fetch') {
-        setError("Network error: Could not reach the server. Please check your connection or CORS settings.")
-      } else {
-        setError(err.message)
-      }
+      setError(err)
       setStep('error')
     }
   }
@@ -232,13 +223,15 @@ export default function EnrollPage() {
           </motion.div>
         )}
 
-        {step === 'error' && (
-          <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20 w-full max-w-md bg-red-500/10 border border-red-500/20 rounded-3xl p-8">
-            <AlertTriangle size={48} className="mx-auto mb-4 text-red-500" strokeWidth={1.5} />
-            <p className="text-zinc-300 mb-6 font-light">{error}</p>
-            <button onClick={() => { setStep('capture'); setCapturedBlobs([]) }} className="py-3 px-8 bg-zinc-900 text-white rounded-full font-medium border border-white/10 hover:bg-zinc-800">
-              Try Again
-            </button>
+        {step === 'error' && error && (
+          <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full flex justify-center pb-20">
+            <NetworkError 
+              error={error} 
+              onRetry={async () => {
+                const fakeEvent = { preventDefault: () => {} } as React.FormEvent
+                await handleSubmit(fakeEvent)
+              }} 
+            />
           </motion.div>
         )}
       </AnimatePresence>
