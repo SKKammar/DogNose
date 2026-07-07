@@ -1,12 +1,13 @@
 'use client'
 import React, { useState } from 'react'
 import CameraCapture from '../components/CameraCapture'
-import { Loader2, AlertTriangle, Fingerprint, ChevronLeft } from 'lucide-react'
+import { Loader2, AlertTriangle, Fingerprint } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { API_URL } from '../../lib/api'
+import AppHeader from '../components/AppHeader'
 
 type IdentifyStatus = 'idle' | 'processing' | 'match' | 'no_match' | 'error'
 
@@ -68,13 +69,12 @@ export default function IdentifyPage() {
   }
 
   return (
-    <div className="min-h-screen p-6 flex flex-col items-center w-full z-10 relative">
-      <div className="w-full max-w-md mb-8 flex items-center">
-        <Link href="/" className="p-2 -ml-2 text-zinc-500 hover:text-zinc-300 transition">
-          <ChevronLeft size={28} strokeWidth={1.5} />
-        </Link>
-        <h1 className="text-2xl font-bold ml-2 tracking-wide text-zinc-100">Identify</h1>
-      </div>
+    <>
+      <AppHeader />
+      <div className="min-h-screen p-6 pt-24 flex flex-col items-center w-full z-10 relative">
+        <div className="w-full max-w-md mb-8 flex items-center justify-center">
+          <h1 className="text-2xl font-bold tracking-wide text-zinc-100">Identify</h1>
+        </div>
 
       <AnimatePresence mode="wait">
         {status === 'idle' && (
@@ -227,5 +227,6 @@ export default function IdentifyPage() {
         )}
       </AnimatePresence>
     </div>
+    </>
   )
 }

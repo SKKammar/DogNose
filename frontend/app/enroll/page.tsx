@@ -1,12 +1,13 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import CameraCapture from '../components/CameraCapture'
-import { ChevronLeft, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Loader2, AlertTriangle, CheckCircle2, Fingerprint } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { API_URL } from '../../lib/api'
+import AppHeader from '../components/AppHeader'
 
 type EnrollStep = 'capture' | 'details' | 'uploading' | 'success' | 'error'
 
@@ -16,7 +17,16 @@ export default function EnrollPage() {
   const [name, setName] = useState('')
   const [breed, setBreed] = useState('')
   const [error, setError] = useState('')
+  const [isAuthChecking, setIsAuthChecking] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(!!session)
+      setIsAuthChecking(false)
+    })
+  }, [])
 
   const handleCapture = (blob: Blob) => {
     const newBlobs = [...capturedBlobs, blob]
@@ -36,8 +46,7 @@ export default function EnrollPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        router.push('/login')
-        return
+        throw new Error("Session expired. Please sign in again.")
       }
 
       // 1. Create dog profile
@@ -79,14 +88,51 @@ export default function EnrollPage() {
     }
   }
 
+  if (isAuthChecking) {
+    return (
+      <>
+        <AppHeader />
+        <div className="min-h-screen p-6 pt-24 flex items-center justify-center w-full z-10 relative text-zinc-500">
+          Loading...
+        </div>
+      </>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <AppHeader />
+        <div className="min-h-screen p-6 pt-24 flex flex-col items-center justify-center w-full z-10 relative">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-20 w-full max-w-md bg-zinc-900/50 backdrop-blur-md p-8 rounded-[2rem] border border-zinc-800 text-center shadow-2xl"
+          >
+            <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6 ring-1 ring-white/5">
+              <Fingerprint className="text-zinc-400" size={32} />
+            </div>
+            <h2 className="text-2xl font-semibold text-zinc-100 mb-3">Sign in Required</h2>
+            <p className="text-zinc-400 mb-10 font-light">Sign in to register a dog and securely store their biometric identity.</p>
+            <Link 
+              href="/login"
+              className="w-full py-4 text-center bg-zinc-100 text-zinc-950 rounded-2xl font-semibold hover:bg-white transition"
+            >
+              Sign In to CANID
+            </Link>
+          </motion.div>
+        </div>
+      </>
+    )
+  }
+
   return (
-    <div className="min-h-screen p-6 flex flex-col items-center w-full z-10 relative">
-      <div className="w-full max-w-md mb-8 flex items-center">
-        <Link href="/" className="p-2 -ml-2 text-zinc-500 hover:text-zinc-300 transition">
-          <ChevronLeft size={28} strokeWidth={1.5} />
-        </Link>
-        <h1 className="text-2xl font-bold ml-2 tracking-wide text-zinc-100">Enroll Identity</h1>
-      </div>
+    <>
+      <AppHeader />
+      <div className="min-h-screen p-6 pt-24 flex flex-col items-center w-full z-10 relative">
+        <div className="w-full max-w-md mb-8 flex items-center justify-center">
+          <h1 className="text-2xl font-bold tracking-wide text-zinc-100">Enroll Identity</h1>
+        </div>
       
       <AnimatePresence mode="wait">
         {step === 'capture' && (
@@ -150,5 +196,6 @@ export default function EnrollPage() {
         )}
       </AnimatePresence>
     </div>
+    </>
   )
 }

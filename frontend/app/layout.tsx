@@ -5,8 +5,8 @@ import { Inter } from 'next/font/google'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Dog Nose-Print ID',
-  description: 'Biometric identification system for dogs using their nose prints',
+  title: 'CANID',
+  description: 'CANID — biometric dog identification by nose print.',
   manifest: '/manifest.json',
   themeColor: '#09090b',
 }

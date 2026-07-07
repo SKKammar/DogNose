@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Camera, ScanFace, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { API_URL } from '../lib/api'
+import AppHeader from './components/AppHeader'
 
 interface Dog {
   id: string;
@@ -74,14 +75,15 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 max-w-2xl mx-auto w-full relative z-10">
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none"></div>
+    <>
+      <AppHeader />
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 pt-24 max-w-2xl mx-auto w-full relative z-10">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none"></div>
 
       {session ? (
-        <div className="w-full flex flex-col pt-12 pb-24">
+        <div className="w-full flex flex-col pt-4 pb-24">
           <div className="flex justify-between items-center mb-10">
             <h1 className="text-3xl font-bold text-zinc-100">Your Dogs</h1>
-            <button onClick={() => supabase.auth.signOut()} className="text-zinc-500 hover:text-zinc-300 text-sm">Sign Out</button>
           </div>
           
           <div className="grid grid-cols-1 gap-4 mb-8">
@@ -135,8 +137,8 @@ export default function HomePage() {
         </div>
       ) : (
         <>
-          <h1 className="text-5xl font-extrabold mb-6 text-center tracking-tight bg-gradient-to-br from-zinc-100 to-zinc-500 bg-clip-text text-transparent">
-            Biometric Identity
+          <h1 className="text-6xl font-extrabold mb-6 text-center tracking-tight bg-gradient-to-br from-zinc-100 to-zinc-500 bg-clip-text text-transparent">
+            CANID
           </h1>
           <p className="text-lg text-zinc-400 mb-10 text-center font-light leading-relaxed">
             Just like a human fingerprint, every dog's nose print is completely unique. Our system identifies dogs instantly with a single scan.
@@ -170,14 +172,10 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="text-center w-full mt-4 border-t border-zinc-800 pt-8">
-            <p className="text-zinc-500 mb-4">Dog owner?</p>
-            <Link href="/login" className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-full transition-colors font-medium">
-              Sign In to Dashboard
-            </Link>
           </div>
         </>
       )}
     </div>
+    </>
   )
 }
