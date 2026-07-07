@@ -46,7 +46,7 @@ export default function EnrollPage() {
     
     setStep('uploading')
     setUploadProgress(0)
-    setError('')
+    setError(null)
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
