@@ -12,7 +12,7 @@ type IdentifyStatus = 'idle' | 'processing' | 'match' | 'no_match' | 'error'
 
 interface MatchResult {
   confidence: number;
-  candidates: { dog_id: string; confidence: number }[];
+  candidates: { dog_id: string; confidence: number; name: string; breed?: string }[];
 }
 
 export default function IdentifyPage() {
@@ -29,21 +29,11 @@ export default function IdentifyPage() {
     const wakeTimer = setTimeout(() => setIsWaking(true), 3000)
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        clearTimeout(wakeTimer)
-        router.push('/login')
-        return
-      }
-
       const formData = new FormData()
       formData.append('file', blob, 'nose.jpg')
 
       const res = await fetch(`${API_URL}/dogs/identify`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        },
         body: formData
       })
       
@@ -181,11 +171,30 @@ export default function IdentifyPage() {
               </div>
               <div className="divide-y divide-zinc-800/50">
                 {result.candidates.map((cand, i) => (
-                  <div key={cand.dog_id} className="p-5 flex justify-between items-center">
-                    <span className="font-mono text-zinc-300 text-sm">ID: {cand.dog_id.substring(0, 8)}</span>
-                    <span className={`text-sm px-3 py-1 rounded-full font-medium ${i === 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-400'}`}>
-                      {(cand.confidence * 100).toFixed(1)}%
-                    </span>
+                  <div key={cand.dog_id} className="p-5 flex flex-col gap-3">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="font-semibold text-zinc-200 text-lg">{cand.name}</span>
+                        {cand.breed && <span className="block text-zinc-500 text-sm">{cand.breed}</span>}
+                      </div>
+                      <span className={`text-sm px-3 py-1 rounded-full font-medium ${i === 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-400'}`}>
+                        {(cand.confidence * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <button 
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`${API_URL}/dogs/${cand.dog_id}/notify-owner`, { method: 'POST' });
+                          if (res.ok) alert("Owner has been notified!");
+                          else alert("Failed to notify owner.");
+                        } catch(e) {
+                          alert("Error notifying owner.");
+                        }
+                      }}
+                      className="w-full py-2 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded-lg text-sm font-medium transition"
+                    >
+                      Notify Owner
+                    </button>
                   </div>
                 ))}
               </div>
