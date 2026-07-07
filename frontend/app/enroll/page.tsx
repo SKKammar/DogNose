@@ -6,25 +6,29 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
+import { API_URL } from '../../lib/api'
 
 type EnrollStep = 'capture' | 'details' | 'uploading' | 'success' | 'error'
 
 export default function EnrollPage() {
   const [step, setStep] = useState<EnrollStep>('capture')
-  const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null)
+  const [capturedBlobs, setCapturedBlobs] = useState<Blob[]>([])
   const [name, setName] = useState('')
   const [breed, setBreed] = useState('')
   const [error, setError] = useState('')
   const router = useRouter()
 
   const handleCapture = (blob: Blob) => {
-    setCapturedBlob(blob)
-    setStep('details')
+    const newBlobs = [...capturedBlobs, blob]
+    setCapturedBlobs(newBlobs)
+    if (newBlobs.length === 3) {
+      setStep('details')
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!capturedBlob || !name) return
+    if (capturedBlobs.length < 3 || !name) return
     
     setStep('uploading')
     setError('')
@@ -37,7 +41,7 @@ export default function EnrollPage() {
       }
 
       // 1. Create dog profile
-      const dogRes = await fetch('http://localhost:8000/dogs', {
+      const dogRes = await fetch(`${API_URL}/dogs`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -49,21 +53,23 @@ export default function EnrollPage() {
       if (!dogRes.ok) throw new Error("Failed to register dog profile")
       const dogData = await dogRes.json()
 
-      // 2. Upload nose print embedding
-      const formData = new FormData()
-      formData.append('file', capturedBlob, 'nose.jpg')
+      // 2. Upload nose print embedding for each blob
+      for (let i = 0; i < capturedBlobs.length; i++) {
+        const formData = new FormData()
+        formData.append('file', capturedBlobs[i], `nose_${i}.jpg`)
 
-      const enrollRes = await fetch(`http://localhost:8000/dogs/${dogData.id}/enroll`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: formData
-      })
+        const enrollRes = await fetch(`${API_URL}/dogs/${dogData.id}/enroll`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: formData
+        })
 
-      if (!enrollRes.ok) {
-        const errData = await enrollRes.json().catch(() => null)
-        throw new Error(errData?.detail || "Failed to extract and store nose print")
+        if (!enrollRes.ok) {
+          const errData = await enrollRes.json().catch(() => null)
+          throw new Error(errData?.detail || `Failed to extract and store nose print (photo ${i+1})`)
+        }
       }
 
       setStep('success')
@@ -85,7 +91,7 @@ export default function EnrollPage() {
       <AnimatePresence mode="wait">
         {step === 'capture' && (
           <motion.div key="capture" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full">
-            <p className="text-center text-zinc-400 mb-8 font-light">Capture a sharp, well-lit photo of the dog's nose to register their biometric signature.</p>
+            <p className="text-center text-zinc-400 mb-8 font-light">Capture a sharp, well-lit photo of the dog's nose to register their biometric signature. ({capturedBlobs.length + 1} of 3)</p>
             <CameraCapture onCapture={handleCapture} />
           </motion.div>
         )}
@@ -106,8 +112,8 @@ export default function EnrollPage() {
                 <button type="submit" className="w-full py-4 mt-4 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition shadow-[0_0_15px_rgba(37,99,235,0.3)]">
                   Register Biometrics
                 </button>
-                <button type="button" onClick={() => setStep('capture')} className="w-full py-3 text-zinc-400 hover:text-white transition">
-                  Retake Photo
+                <button type="button" onClick={() => { setStep('capture'); setCapturedBlobs([]) }} className="w-full py-3 text-zinc-400 hover:text-white transition">
+                  Retake Photos
                 </button>
               </form>
             </div>
@@ -137,7 +143,7 @@ export default function EnrollPage() {
           <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20 w-full max-w-md bg-red-500/10 border border-red-500/20 rounded-3xl p-8">
             <AlertTriangle size={48} className="mx-auto mb-4 text-red-500" strokeWidth={1.5} />
             <p className="text-zinc-300 mb-6 font-light">{error}</p>
-            <button onClick={() => setStep('capture')} className="py-3 px-8 bg-zinc-900 text-white rounded-full font-medium border border-white/10 hover:bg-zinc-800">
+            <button onClick={() => { setStep('capture'); setCapturedBlobs([]) }} className="py-3 px-8 bg-zinc-900 text-white rounded-full font-medium border border-white/10 hover:bg-zinc-800">
               Try Again
             </button>
           </motion.div>

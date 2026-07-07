@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
+import { API_URL } from '../../lib/api'
 
 type IdentifyStatus = 'idle' | 'processing' | 'match' | 'no_match' | 'error'
 
@@ -18,14 +19,19 @@ export default function IdentifyPage() {
   const [status, setStatus] = useState<IdentifyStatus>('idle')
   const [result, setResult] = useState<MatchResult | null>(null)
   const [error, setError] = useState<string>('')
+  const [isWaking, setIsWaking] = useState(false)
 
   const router = useRouter()
 
   const handleCapture = async (blob: Blob) => {
     setStatus('processing')
+    setIsWaking(false)
+    const wakeTimer = setTimeout(() => setIsWaking(true), 3000)
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
+        clearTimeout(wakeTimer)
         router.push('/login')
         return
       }
@@ -33,13 +39,15 @@ export default function IdentifyPage() {
       const formData = new FormData()
       formData.append('file', blob, 'nose.jpg')
 
-      const res = await fetch('http://localhost:8000/dogs/identify', {
+      const res = await fetch(`${API_URL}/dogs/identify`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         },
         body: formData
       })
+      
+      clearTimeout(wakeTimer)
       
       if (!res.ok) {
         if (res.status === 503) {
@@ -63,6 +71,7 @@ export default function IdentifyPage() {
         setStatus('no_match')
       }
     } catch (err: any) {
+      clearTimeout(wakeTimer)
       setError(err.message)
       setStatus('error')
     }
@@ -107,7 +116,9 @@ export default function IdentifyPage() {
               </div>
             </div>
             <h2 className="text-2xl font-light tracking-widest text-zinc-200 mb-2">ANALYZING</h2>
-            <p className="text-zinc-500 text-sm tracking-wide">Extracting biometric embedding...</p>
+            <p className="text-zinc-500 text-sm tracking-wide text-center">
+              {isWaking ? "Waking up the matching engine, this can take up to 30 seconds..." : "Extracting biometric embedding..."}
+            </p>
           </motion.div>
         )}
 

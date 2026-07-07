@@ -3,15 +3,21 @@ import torch
 from ultralytics import YOLO
 from train_embedder import NoseEmbedder
 
+import shutil
+
 def export_detector():
     print("Exporting YOLOv8n detector to ONNX...")
-    model_path = "runs/detect/dog_nose_detector/weights/best.pt"
+    model_path = "best.pt"
     if not os.path.exists(model_path):
         print(f"Skipping detector export: {model_path} not found.")
         return
         
     model = YOLO(model_path)
-    model.export(format="onnx", imgsz=640, dynamic=True)
+    exported_path = model.export(format="onnx", imgsz=640, dynamic=True, opset=14)
+    
+    # Move the exported model to models/detector.onnx
+    os.makedirs("models", exist_ok=True)
+    shutil.move(exported_path, "models/detector.onnx")
     print("Detector exported to ONNX successfully.")
 
 def export_embedder():
