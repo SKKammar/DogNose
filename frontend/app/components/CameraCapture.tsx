@@ -3,11 +3,12 @@ import React, { useRef, useState, useCallback, useEffect } from 'react'
 import { Camera, RefreshCcw, Upload, ScanLine } from 'lucide-react'
 
 interface CameraCaptureProps {
-  onCapture: (blob: Blob) => void
+  onCapture: (blob: Blob | Blob[]) => void
   isScanning?: boolean
+  remainingPhotos?: number
 }
 
-export default function CameraCapture({ onCapture, isScanning = false }: CameraCaptureProps) {
+export default function CameraCapture({ onCapture, isScanning = false, remainingPhotos = 3 }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   
@@ -79,18 +80,48 @@ export default function CameraCapture({ onCapture, isScanning = false }: CameraC
   }, [mode, onCapture, isScanning])
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      onCapture(e.target.files[0])
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'))
+      onCapture(files.slice(0, remainingPhotos))
+    }
+  }
+
+  const [isDragging, setIsDragging] = useState(false)
+  
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+  
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+  
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+      onCapture(files.slice(0, remainingPhotos))
     }
   }
 
   if (mode === 'upload') {
     return (
-      <div className="flex flex-col items-center justify-center p-10 border border-zinc-800 rounded-3xl bg-zinc-900/50 w-full max-w-md mx-auto backdrop-blur-sm relative overflow-hidden">
-        <Upload className="text-zinc-500 mb-4" size={48} strokeWidth={1} />
-        <p className="text-zinc-400 mb-6 text-center font-light">Camera unavailable. Upload a clear photo of the dog's nose.</p>
+      <div 
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`flex flex-col items-center justify-center p-10 border rounded-3xl w-full max-w-md mx-auto backdrop-blur-sm relative overflow-hidden transition ${isDragging ? 'border-blue-500 bg-zinc-800/80' : 'border-zinc-800 bg-zinc-900/50'}`}
+      >
+        <Upload className={`${isDragging ? 'text-blue-400' : 'text-zinc-500'} mb-4 transition`} size={48} strokeWidth={1} />
+        <p className="text-zinc-400 mb-6 text-center font-light">
+          {isDragging ? 'Drop photos here' : "Camera unavailable. Upload clear photos of the dog's nose."}
+        </p>
         <input 
           type="file" 
+          multiple
           accept="image/jpeg,image/png,image/webp" 
           onChange={handleFileUpload}
           className="block w-full text-sm text-zinc-400 file:mr-4 file:py-3 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 transition"

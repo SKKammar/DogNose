@@ -30,9 +30,10 @@ export default function EnrollPage() {
     })
   }, [])
 
-  const handleCapture = (blob: Blob) => {
-    if (capturedBlobs.length < 5) {
-      setCapturedBlobs([...capturedBlobs, blob])
+  const handleCapture = (blobs: Blob | Blob[]) => {
+    const newBlobs = Array.isArray(blobs) ? blobs : [blobs]
+    if (capturedBlobs.length < 3) {
+      setCapturedBlobs([...capturedBlobs, ...newBlobs].slice(0, 3))
     }
   }
 
@@ -143,14 +144,14 @@ export default function EnrollPage() {
                 <span className="text-sm font-medium">Back to Home</span>
               </Link>
             </div>
-            <p className="text-center text-zinc-400 mb-8 font-light">Capture clear photos of the dog's nose (up to 5).</p>
-            <CameraCapture onCapture={handleCapture} />
+            <p className="text-center text-zinc-400 mb-8 font-light">Capture clear photos of the dog's nose (up to 3).</p>
+            <CameraCapture onCapture={handleCapture} remainingPhotos={3 - capturedBlobs.length} />
             
             {capturedBlobs.length > 0 && (
               <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-zinc-300 text-sm font-medium">Captured Photos</h3>
-                  <span className="text-xs font-medium px-2 py-1 bg-zinc-800 text-zinc-400 rounded-full">{capturedBlobs.length} / 5</span>
+                  <span className="text-xs font-medium px-2 py-1 bg-zinc-800 text-zinc-400 rounded-full">{capturedBlobs.length} / 3</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
                   {capturedBlobs.map((blob, idx) => (
@@ -192,7 +193,7 @@ export default function EnrollPage() {
                 <button type="submit" className="w-full py-4 mt-4 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition shadow-[0_0_15px_rgba(37,99,235,0.3)]">
                   Register Biometrics
                 </button>
-                <button type="button" onClick={() => { setStep('capture'); setCapturedBlobs([]) }} className="w-full py-3 text-zinc-400 hover:text-white transition">
+                <button type="button" onClick={() => { setStep('capture') }} className="w-full py-3 text-zinc-400 hover:text-white transition">
                   Retake Photos
                 </button>
               </form>

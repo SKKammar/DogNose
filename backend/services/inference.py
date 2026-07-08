@@ -5,23 +5,30 @@ import onnxruntime as ort
 from ml.preprocessing import preprocess_image
 
 DETECTOR_MODEL_PATH = os.getenv("DETECTOR_MODEL_PATH", "models/detector.onnx")
-EMBEDDER_MODEL_PATH = os.getenv("EMBEDDER_MODEL_PATH", "models/embedder.onnx")
+EMBEDDER_MODEL_PATHS = {
+    "v1": os.getenv("EMBEDDER_MODEL_PATH_V1", "models/embedder.onnx"),
+    # Add new versions here as they become available
+    # "v2": os.getenv("EMBEDDER_MODEL_PATH_V2", "models/embedder_v2.onnx"),
+}
 
 detector_session = None
-embedder_session = None
+embedder_sessions = {}
 
 def init_models():
-    global detector_session, embedder_session
-    if os.path.exists(DETECTOR_MODEL_PATH) and os.path.exists(EMBEDDER_MODEL_PATH):
-        if detector_session is None:
-            detector_session = ort.InferenceSession(DETECTOR_MODEL_PATH)
-        if embedder_session is None:
-            embedder_session = ort.InferenceSession(EMBEDDER_MODEL_PATH)
+    global detector_session, embedder_sessions
+    if os.path.exists(DETECTOR_MODEL_PATH) and detector_session is None:
+        detector_session = ort.InferenceSession(DETECTOR_MODEL_PATH)
+        
+    for version, path in EMBEDDER_MODEL_PATHS.items():
+        if os.path.exists(path) and version not in embedder_sessions:
+            embedder_sessions[version] = ort.InferenceSession(path)
 
-def extract_embedding(image_bytes: bytes) -> np.ndarray:
+def extract_embedding(image_bytes: bytes, version: str) -> np.ndarray:
     init_models()
-    if not detector_session or not embedder_session:
-        raise RuntimeError("ONNX Models are not loaded. Inference cannot proceed.")
+    if not detector_session or version not in embedder_sessions:
+        raise RuntimeError(f"ONNX Models are not loaded for version {version}. Inference cannot proceed.")
+    
+    embedder_session = embedder_sessions[version]
 
     # 1. Decode image
     nparr = np.frombuffer(image_bytes, np.uint8)

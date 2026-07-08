@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional
 from supabase import Client
-from backend.dependencies import get_supabase, get_anon_supabase
+from backend.dependencies import get_supabase, get_anon_supabase, security
 from backend.services.inference import extract_embedding
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -21,7 +21,7 @@ MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "8"))
 MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 ALLOWED_UPLOAD_TYPES = os.getenv("ALLOWED_UPLOAD_TYPES", "image/jpeg,image/png,image/webp").split(",")
 MATCH_THRESHOLD = float(os.getenv("MATCH_THRESHOLD", "0.65"))
-EMBEDDING_VERSION = os.getenv("EMBEDDING_VERSION", "v1")
+ACTIVE_EMBEDDING_VERSION = os.getenv("ACTIVE_EMBEDDING_VERSION", "v1")
 IDENTIFY_RATE_LIMIT = os.getenv("IDENTIFY_RATE_LIMIT", "10/minute")
 
 class DogCreate(BaseModel):
@@ -76,9 +76,16 @@ async def validate_image(request: Request, file: UploadFile):
         
     return buffer.tobytes()
 
+from fastapi.security import HTTPAuthorizationCredentials
+from fastapi import Security
+
 @router.post("", response_model=DogResponse)
-def register_dog(dog: DogCreate, supabase: Client = Depends(get_supabase)):
-    user_res = supabase.auth.get_user()
+def register_dog(
+    dog: DogCreate, 
+    supabase: Client = Depends(get_supabase),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    user_res = supabase.auth.get_user(credentials.credentials)
     if not user_res or not user_res.user:
         raise HTTPException(status_code=401, detail="Unauthorized")
         
@@ -104,7 +111,7 @@ async def enroll_dog(request: Request, dog_id: str, file: UploadFile = File(...)
     image_bytes = await validate_image(request, file)
     
     try:
-        embedding = extract_embedding(image_bytes)
+        embedding = extract_embedding(image_bytes, ACTIVE_EMBEDDING_VERSION)
     except ValueError as e:
         msg = str(e)
         if "NO_NOSE" in msg or "MULTIPLE_NOSES" in msg:
@@ -114,7 +121,7 @@ async def enroll_dog(request: Request, dog_id: str, file: UploadFile = File(...)
     data = {
         "dog_id": dog_id,
         "embedding": embedding.tolist(),
-        "embedding_version": EMBEDDING_VERSION
+        "embedding_version": ACTIVE_EMBEDDING_VERSION
     }
     
     try:
@@ -133,7 +140,7 @@ async def identify_dog(request: Request, file: UploadFile = File(...), supabase:
     image_bytes = await validate_image(request, file)
     
     try:
-        embedding = extract_embedding(image_bytes)
+        embedding = extract_embedding(image_bytes, ACTIVE_EMBEDDING_VERSION)
     except ValueError as e:
         msg = str(e)
         if "NO_NOSE" in msg or "MULTIPLE_NOSES" in msg:
@@ -143,7 +150,8 @@ async def identify_dog(request: Request, file: UploadFile = File(...), supabase:
     res = supabase.rpc("match_lost_dogs", {
         "query_embedding": embedding.tolist(),
         "match_threshold": MATCH_THRESHOLD,
-        "match_count": 3
+        "match_count": 3,
+        "p_embedding_version": ACTIVE_EMBEDDING_VERSION
     }).execute()
     
     if not res.data:

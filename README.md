@@ -5,7 +5,13 @@ DoGNose is a biometric identification system that acts like a fingerprint scanne
 > **Note on Project Scope and Limitations (v0.1.0 MVP)**
 > - **Liveness Detection:** Currently relies on standard camera capture frames. Advanced sharpness/variance gating is planned for v1.1.
 > - **Age Constraints:** Nose prints stabilize as dogs mature; the system works best for adult dogs.
-> - **Dataset:** The current match threshold is provisional, tuned on the CVPR Pet Biometric Challenge dataset. Real-world varying lighting/angles may require additional threshold calibration.
+## Upgrading the Embedder
+
+To deploy a new embedder version (e.g., `v2`):
+1. Add the new `.onnx` model to the `/models` directory.
+2. Update the `backend/services/inference.py` to load the new version into `embedder_sessions`.
+3. Set the environment variable `ACTIVE_EMBEDDING_VERSION=v2`.
+4. Existing dogs enrolled with `v1` will still have their data in the database, but they will not match against new `v2` queries since they exist in different vector spaces. To make them matchable again under `v2`, they must be re-enrolled using the frontend. They do not automatically disappear, but they need the new biometric signature to be recognized by the new active model.
 
 ## Local Setup
 
@@ -63,7 +69,8 @@ You can deploy the backend easily using Render's native Python Web Service witho
    ```bash
    uvicorn backend.main:app --host 0.0.0.0 --port $PORT
    ```
-5. Add your Supabase environment variables in the Render dashboard.
+5. Add your Supabase environment variables (`SUPABASE_URL`, `SUPABASE_ANON_KEY`) in the Render dashboard.
+6. **Crucial:** Add `ALLOWED_ORIGINS` in the Render dashboard environment variables and set it to your exact frontend URL (e.g. `https://dog-nose.vercel.app`), without a trailing slash, to fix CORS errors.
 
 ### Deploying the Frontend (Vercel)
 1. Import the `frontend/` directory as a new project on Vercel.
