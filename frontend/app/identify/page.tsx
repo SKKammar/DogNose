@@ -25,7 +25,8 @@ export default function IdentifyPage() {
 
   const router = useRouter()
 
-  const handleCapture = async (blob: Blob) => {
+  const handleCapture = async (blobData: Blob | Blob[]) => {
+    const blob = Array.isArray(blobData) ? blobData[0] : blobData;
     setStatus('processing')
     setIsWaking(false)
     const wakeTimer = setTimeout(() => setIsWaking(true), 3000)
