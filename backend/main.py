@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     Startup lifespan: load ONNX models once into memory.
     Models are loaded via the inference module's init_models().
     """
-    from .services.inference import init_models, models_ready
+    from services.inference import init_models, models_ready
 
     logger.info("Starting model initialization...")
     init_models()
@@ -68,7 +68,7 @@ async def check_models_for_inference(request: Request, call_next):
     Middleware that blocks inference endpoints if ML models are not loaded.
     Returns 503 with a helpful message for the frontend to display.
     """
-    from .services.inference import models_ready
+    from services.inference import models_ready
 
     inference_routes = ["/dogs/identify", "/enroll"]
     path = request.url.path
@@ -87,6 +87,6 @@ async def check_models_for_inference(request: Request, call_next):
 @app.get("/health")
 def health_check():
     """Health check endpoint for Render. Returns model readiness status."""
-    from .services.inference import models_ready
+    from services.inference import models_ready
 
     return {"status": "ok", "inference_ready": models_ready()}
