@@ -6,11 +6,11 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional
 
-from ..dependencies import (
+from dependencies import (
     get_service_supabase,
     get_current_user_id,
 )
-from ..services.inference import extract_embedding
+from services.inference import extract_embedding
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address

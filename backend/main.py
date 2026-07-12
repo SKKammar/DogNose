@@ -56,8 +56,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Import and include routers (relative imports)
-from .routers import dogs  # noqa: E402
+# Import and include routers
+from routers import dogs  # noqa: E402
 
 app.include_router(dogs.router)
 
