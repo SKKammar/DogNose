@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 import numpy as np
 import cv2
@@ -16,8 +14,10 @@ EMBEDDER_MODEL_PATHS = {
     # "v2": os.getenv("EMBEDDER_MODEL_PATH_V2", "models/embedder_v2.onnx"),
 }
 
+from typing import Optional
+
 # Module-level session holders (initialized by main.py lifespan)
-detector_session: ort.InferenceSession | None = None
+detector_session: Optional[ort.InferenceSession] = None
 embedder_sessions: dict[str, ort.InferenceSession] = {}
 
 

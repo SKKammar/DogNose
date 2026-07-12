@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 import logging
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
