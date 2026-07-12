@@ -5,23 +5,29 @@ import { Loader2, AlertTriangle, CheckCircle2, Fingerprint, X, ChevronLeft } fro
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
-import { useRouter } from 'next/navigation'
-import { API_URL, fetchWithErrorHandling, ApiError } from '../../lib/api'
+import { registerDog, enrollNose, ApiError } from '../../lib/api'
 import AppHeader from '../components/AppHeader'
 import NetworkError from '../components/NetworkError'
 
-type EnrollStep = 'capture' | 'details' | 'uploading' | 'success' | 'error'
+type EnrollStep = 'details' | 'capture' | 'uploading' | 'success' | 'error'
+
+interface PhotoStatus {
+  blob: Blob
+  status: 'pending' | 'uploading' | 'success' | 'error'
+  error?: string
+}
 
 export default function EnrollPage() {
-  const [step, setStep] = useState<EnrollStep>('capture')
-  const [capturedBlobs, setCapturedBlobs] = useState<Blob[]>([])
+  const [step, setStep] = useState<EnrollStep>('details')
+  const [photos, setPhotos] = useState<PhotoStatus[]>([])
   const [name, setName] = useState('')
   const [breed, setBreed] = useState('')
   const [error, setError] = useState<ApiError | null>(null)
-  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadIndex, setUploadIndex] = useState(0)
+  const [enrolledDogName, setEnrolledDogName] = useState('')
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const router = useRouter()
+  const [retakeIndex, setRetakeIndex] = useState<number | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -32,21 +38,32 @@ export default function EnrollPage() {
 
   const handleCapture = (blobs: Blob | Blob[]) => {
     const newBlobs = Array.isArray(blobs) ? blobs : [blobs]
-    if (capturedBlobs.length < 3) {
-      setCapturedBlobs([...capturedBlobs, ...newBlobs].slice(0, 3))
+    
+    if (retakeIndex !== null) {
+      // Replacing a specific photo that failed
+      setPhotos(prev => {
+        const updated = [...prev]
+        updated[retakeIndex] = { blob: newBlobs[0], status: 'pending' }
+        return updated
+      })
+      setRetakeIndex(null)
+    } else if (photos.length < 3) {
+      const newPhotos = newBlobs
+        .slice(0, 3 - photos.length)
+        .map(b => ({ blob: b, status: 'pending' as const }))
+      setPhotos(prev => [...prev, ...newPhotos])
     }
   }
 
-  const removeBlob = (index: number) => {
-    setCapturedBlobs(capturedBlobs.filter((_, i) => i !== index))
+  const removePhoto = (index: number) => {
+    setPhotos(photos.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (capturedBlobs.length < 1 || !name) return
-    
+  const handleSubmit = async () => {
+    if (photos.length < 1 || !name) return
+
     setStep('uploading')
-    setUploadProgress(0)
+    setUploadIndex(0)
     setError(null)
 
     try {
@@ -54,34 +71,45 @@ export default function EnrollPage() {
       if (!session) {
         throw { type: 'server', message: "Session expired. Please sign in again." }
       }
+      const token = session.access_token
 
       // 1. Create dog profile
-      const dogRes = await fetchWithErrorHandling(`${API_URL}/dogs`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name, breed })
-      })
-      
-      const dogData = await dogRes.json()
+      const dogData = await registerDog(name, breed || null, token)
 
-      // 2. Upload nose print embedding for each blob
-      for (let i = 0; i < capturedBlobs.length; i++) {
-        setUploadProgress(i + 1)
-        const formData = new FormData()
-        formData.append('file', capturedBlobs[i], `nose_${i}.jpg`)
-
-        await fetchWithErrorHandling(`${API_URL}/dogs/${dogData.id}/enroll`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: formData
+      // 2. Upload each nose print sequentially
+      for (let i = 0; i < photos.length; i++) {
+        setUploadIndex(i + 1)
+        setPhotos(prev => {
+          const updated = [...prev]
+          updated[i] = { ...updated[i], status: 'uploading' }
+          return updated
         })
+
+        try {
+          await enrollNose(dogData.id, photos[i].blob, token)
+          setPhotos(prev => {
+            const updated = [...prev]
+            updated[i] = { ...updated[i], status: 'success' }
+            return updated
+          })
+        } catch (enrollErr: any) {
+          const detail = enrollErr?.message || enrollErr?.detail || 'Unknown error'
+          if (detail === 'no_nose_detected') {
+            setPhotos(prev => {
+              const updated = [...prev]
+              updated[i] = { ...updated[i], status: 'error', error: `No nose found in photo ${i + 1} — retake it` }
+              return updated
+            })
+            // Jump back to capture mode for retake
+            setRetakeIndex(i)
+            setStep('capture')
+            return
+          }
+          throw enrollErr
+        }
       }
 
+      setEnrolledDogName(name)
       setStep('success')
     } catch (err: any) {
       setError(err)
@@ -136,29 +164,100 @@ export default function EnrollPage() {
         </div>
       
       <AnimatePresence mode="wait">
-        {step === 'capture' && (
-          <motion.div key="capture" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full max-w-md">
+        {/* Step 1: Dog Details */}
+        {step === 'details' && (
+          <motion.div key="details" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full max-w-md">
             <div className="flex justify-between items-center mb-6">
               <Link href="/" className="flex items-center text-zinc-400 hover:text-white transition">
                 <ChevronLeft size={20} className="mr-1" />
                 <span className="text-sm font-medium">Back to Home</span>
               </Link>
+              <span className="text-xs text-zinc-500 font-medium px-2 py-1 bg-zinc-800/50 rounded-full">Step 1 of 2</span>
             </div>
-            <p className="text-center text-zinc-400 mb-8 font-light">Capture clear photos of the dog's nose (up to 3).</p>
-            <CameraCapture onCapture={handleCapture} remainingPhotos={3 - capturedBlobs.length} />
+            <div className="bg-zinc-900/50 backdrop-blur-md p-8 rounded-[2rem] border border-zinc-800 shadow-2xl">
+              <h2 className="text-xl font-semibold text-white mb-6">Dog Information</h2>
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1">Dog&apos;s Name <span className="text-red-400">*</span></label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={name} 
+                    onChange={e => setName(e.target.value)} 
+                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" 
+                    placeholder="e.g. Max" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1">Breed (Optional)</label>
+                  <input 
+                    type="text" 
+                    value={breed} 
+                    onChange={e => setBreed(e.target.value)} 
+                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" 
+                    placeholder="e.g. Golden Retriever" 
+                  />
+                </div>
+                <button 
+                  onClick={() => { if (name.trim()) setStep('capture') }}
+                  disabled={!name.trim()}
+                  className="w-full py-4 mt-4 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition shadow-[0_0_15px_rgba(37,99,235,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next — Capture Photos
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Step 2: Capture Photos */}
+        {step === 'capture' && (
+          <motion.div key="capture" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full max-w-md">
+            <div className="flex justify-between items-center mb-6">
+              <button onClick={() => setStep('details')} className="flex items-center text-zinc-400 hover:text-white transition">
+                <ChevronLeft size={20} className="mr-1" />
+                <span className="text-sm font-medium">Back</span>
+              </button>
+              <span className="text-xs text-zinc-500 font-medium px-2 py-1 bg-zinc-800/50 rounded-full">Step 2 of 2</span>
+            </div>
+
+            {retakeIndex !== null && (
+              <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-400 text-sm flex items-center gap-2">
+                <AlertTriangle size={16} />
+                <span>Retake photo {retakeIndex + 1} — no nose was detected in it</span>
+              </div>
+            )}
+
+            <p className="text-center text-zinc-400 mb-6 font-light">
+              {retakeIndex !== null 
+                ? `Capture a replacement for photo ${retakeIndex + 1}`
+                : "Capture clear photos of the dog's nose (up to 3)."
+              }
+            </p>
+            <CameraCapture onCapture={handleCapture} remainingPhotos={retakeIndex !== null ? 1 : 3 - photos.length} />
             
-            {capturedBlobs.length > 0 && (
+            {photos.length > 0 && (
               <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-zinc-300 text-sm font-medium">Captured Photos</h3>
-                  <span className="text-xs font-medium px-2 py-1 bg-zinc-800 text-zinc-400 rounded-full">{capturedBlobs.length} / 3</span>
+                  <span className="text-xs font-medium px-2 py-1 bg-zinc-800 text-zinc-400 rounded-full">{photos.length} / 3</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
-                  {capturedBlobs.map((blob, idx) => (
+                  {photos.map((photo, idx) => (
                     <div key={idx} className="relative w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-zinc-700 snap-center shadow-lg">
-                      <img src={URL.createObjectURL(blob)} className="w-full h-full object-cover" />
+                      <img src={URL.createObjectURL(photo.blob)} className="w-full h-full object-cover" alt={`Photo ${idx + 1}`} />
+                      {photo.status === 'error' && (
+                        <div className="absolute inset-0 bg-red-500/30 flex items-center justify-center">
+                          <AlertTriangle size={20} className="text-white" />
+                        </div>
+                      )}
+                      {photo.status === 'success' && (
+                        <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center">
+                          <CheckCircle2 size={20} className="text-emerald-400" />
+                        </div>
+                      )}
                       <button 
-                        onClick={() => removeBlob(idx)}
+                        onClick={() => removePhoto(idx)}
                         className="absolute top-1 right-1 w-6 h-6 bg-red-500/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500 transition"
                       >
                         <X size={14} className="text-white" />
@@ -167,70 +266,71 @@ export default function EnrollPage() {
                   ))}
                 </div>
                 <button 
-                  onClick={() => setStep('details')}
-                  className="w-full py-4 mt-2 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition shadow-[0_0_15px_rgba(37,99,235,0.3)] flex justify-center items-center gap-2"
+                  onClick={handleSubmit}
+                  disabled={photos.length < 1}
+                  className="w-full py-4 mt-2 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition shadow-[0_0_15px_rgba(37,99,235,0.3)] flex justify-center items-center gap-2 disabled:opacity-40"
                 >
-                  Continue to Details <CheckCircle2 size={18} />
+                  Submit {photos.length} Photo{photos.length !== 1 ? 's' : ''} <CheckCircle2 size={18} />
                 </button>
               </div>
             )}
           </motion.div>
         )}
 
-        {step === 'details' && (
-          <motion.div key="details" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
-            <div className="bg-zinc-900/50 backdrop-blur-md p-8 rounded-[2rem] border border-zinc-800 shadow-2xl">
-              <h2 className="text-xl font-semibold text-white mb-6">Subject Details</h2>
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-1">Dog's Name</label>
-                  <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" placeholder="e.g. Max" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-1">Breed (Optional)</label>
-                  <input type="text" value={breed} onChange={e => setBreed(e.target.value)} className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" placeholder="e.g. Golden Retriever" />
-                </div>
-                <button type="submit" className="w-full py-4 mt-4 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition shadow-[0_0_15px_rgba(37,99,235,0.3)]">
-                  Register Biometrics
-                </button>
-                <button type="button" onClick={() => { setStep('capture') }} className="w-full py-3 text-zinc-400 hover:text-white transition">
-                  Retake Photos
-                </button>
-              </form>
+        {/* Step 3: Uploading */}
+        {step === 'uploading' && (
+          <motion.div key="uploading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center py-32 w-full max-w-md">
+            <Loader2 className="animate-spin text-blue-500 mb-4" size={48} />
+            <h2 className="text-xl font-light text-zinc-200">ENROLLING</h2>
+            <p className="text-zinc-500 text-sm mt-2">
+              {uploadIndex > 0 
+                ? `Enrolling photo ${uploadIndex} of ${photos.length}…` 
+                : "Creating dog profile…"}
+            </p>
+            <div className="w-48 h-1 bg-zinc-800 rounded-full mt-6 overflow-hidden">
+              <motion.div 
+                className="h-full bg-blue-500 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${(uploadIndex / photos.length) * 100}%` }}
+                transition={{ duration: 0.5 }}
+              />
             </div>
           </motion.div>
         )}
 
-        {step === 'uploading' && (
-          <motion.div key="uploading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center py-32 w-full max-w-md">
-            <Loader2 className="animate-spin text-blue-500 mb-4" size={48} />
-            <h2 className="text-xl font-light text-zinc-200">SECURING DATA</h2>
-            <p className="text-zinc-500 text-sm mt-2">
-              {uploadProgress > 0 
-                ? `Uploading photo ${uploadProgress} of ${capturedBlobs.length}...` 
-                : "Encrypting embedding and saving profile..."}
-            </p>
-          </motion.div>
-        )}
-
+        {/* Step 4: Success */}
         {step === 'success' && (
           <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center py-20 w-full max-w-md bg-zinc-900/50 backdrop-blur-md p-8 rounded-[2rem] border border-zinc-800 text-center">
             <CheckCircle2 className="text-emerald-500 mb-6" size={64} />
-            <h2 className="text-2xl font-bold text-white mb-2">Enrollment Complete</h2>
-            <p className="text-zinc-400 mb-10">The biometric signature has been successfully linked to {name}.</p>
-            <Link href="/" className="w-full py-4 bg-zinc-800 text-white rounded-2xl font-semibold hover:bg-zinc-700 transition">
-              Return to Dashboard
-            </Link>
+            <h2 className="text-2xl font-bold text-white mb-2">Enrolled Successfully ✓</h2>
+            <p className="text-zinc-400 mb-10">{enrolledDogName}&apos;s biometric signature has been securely stored.</p>
+            <div className="w-full space-y-3">
+              <button
+                onClick={() => {
+                  setStep('details')
+                  setName('')
+                  setBreed('')
+                  setPhotos([])
+                  setEnrolledDogName('')
+                }}
+                className="w-full py-4 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition"
+              >
+                Enroll Another Dog
+              </button>
+              <Link href="/identify" className="block w-full py-4 bg-zinc-800 text-white rounded-2xl font-semibold hover:bg-zinc-700 transition text-center">
+                Go Identify
+              </Link>
+            </div>
           </motion.div>
         )}
 
+        {/* Error State */}
         {step === 'error' && error && (
           <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full flex justify-center pb-20">
             <NetworkError 
               error={error} 
               onRetry={async () => {
-                const fakeEvent = { preventDefault: () => {} } as React.FormEvent
-                await handleSubmit(fakeEvent)
+                await handleSubmit()
               }} 
             />
           </motion.div>

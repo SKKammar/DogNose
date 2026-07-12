@@ -24,12 +24,17 @@ export default function AppHeader() {
         CANID
       </Link>
       {session ? (
-        <button 
-          onClick={() => supabase.auth.signOut()} 
-          className="text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-colors"
-        >
-          Sign Out
-        </button>
+        <div className="flex items-center gap-4">
+          <span className="text-xs text-zinc-500 hidden sm:inline truncate max-w-[160px]">
+            {session.user?.email}
+          </span>
+          <button 
+            onClick={() => supabase.auth.signOut()} 
+            className="text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
       ) : (
         <Link 
           href="/login" 

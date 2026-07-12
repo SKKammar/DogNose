@@ -14,62 +14,79 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DETECTOR_MODEL_PATH = os.getenv("DETECTOR_MODEL_PATH", "models/detector.onnx")
-EMBEDDER_MODEL_PATH = os.getenv("EMBEDDER_MODEL_PATH", "models/embedder.onnx")
-
-MODELS_LOADED = False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global MODELS_LOADED
-    detector_exists = os.path.exists(DETECTOR_MODEL_PATH)
-    embedder_exists = os.path.exists(EMBEDDER_MODEL_PATH)
-    
-    if not detector_exists or not embedder_exists:
-        logger.error(f"Missing ONNX models. Detector: {detector_exists}, Embedder: {embedder_exists}")
-        logger.error("Inference endpoints will return 503 Service Unavailable.")
-        MODELS_LOADED = False
+    """
+    Startup lifespan: load ONNX models once into memory.
+    Models are loaded via the inference module's init_models().
+    """
+    from .services.inference import init_models, models_ready
+
+    logger.info("Starting model initialization...")
+    init_models()
+
+    if models_ready():
+        logger.info("All ONNX models loaded successfully. Inference enabled.")
     else:
-        logger.info("ONNX models found. Inference enabled.")
-        MODELS_LOADED = True
-        
+        logger.error("Some ONNX models failed to load. Inference endpoints will return 503.")
+
     yield
+
+    logger.info("Shutting down — releasing model resources.")
+
 
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="CANID API",
+    description="Dog nose-print biometric identification backend",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
-allowed_origins = [origin.strip().rstrip('/') for origin in allowed_origins_str.split(",")]
-logger.info(f"CORS setup with allowed_origins: {allowed_origins}")
-
+# CORS: allow all origins for Vercel → Render cross-origin calls
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Import routers after app creation to avoid circular deps if needed
-from backend.routers import dogs
+# Import and include routers (relative imports)
+from .routers import dogs  # noqa: E402
+
 app.include_router(dogs.router)
+
 
 @app.middleware("http")
 async def check_models_for_inference(request: Request, call_next):
+    """
+    Middleware that blocks inference endpoints if ML models are not loaded.
+    Returns 503 with a helpful message for the frontend to display.
+    """
+    from .services.inference import models_ready
+
     inference_routes = ["/dogs/identify", "/enroll"]
     path = request.url.path
     if any(route in path for route in inference_routes) and request.method == "POST":
-        if not MODELS_LOADED:
+        if not models_ready():
             return JSONResponse(
                 status_code=503,
-                content={"detail": "ML models are currently unavailable. Inference cannot be performed."}
+                content={
+                    "detail": "ML models are currently unavailable. The server may still be starting up."
+                },
             )
     response = await call_next(request)
     return response
 
+
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "inference_ready": MODELS_LOADED}
+    """Health check endpoint for Render. Returns model readiness status."""
+    from .services.inference import models_ready
+
+    return {"status": "ok", "inference_ready": models_ready()}

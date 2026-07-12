@@ -1,13 +1,13 @@
-name: Supabase Keep-Alive
+name: Supabase & Render Keepalive
 
 on:
   schedule:
-    # Run at 00:00 every 3 days
-    - cron: '0 0 */3 * *'
+    # Run at 12:00 UTC every 3 days
+    - cron: '0 12 */3 * *'
   workflow_dispatch: # Allow manual triggering
 
 jobs:
-  ping-supabase:
+  ping:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Supabase to keep project active
@@ -16,13 +16,16 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "Secrets are not set. Skipping ping."
+            echo "Supabase secrets not set. Skipping."
             exit 0
           fi
-          
-          curl -s -o /dev/null -w "%{http_code}" \
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X GET "${SUPABASE_URL}/rest/v1/dogs?select=id&limit=1" \
             -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}"
-          
-          echo "Ping complete."
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+          echo "Supabase ping status: $STATUS"
+
+      - name: Ping Render backend health endpoint
+        run: |
+          curl -f https://dognose-backend.onrender.com/health || echo "Cold start expected — backend will wake up"

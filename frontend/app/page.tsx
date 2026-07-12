@@ -3,14 +3,14 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Camera, ScanFace, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { API_URL } from '../lib/api'
+import { listDogs } from '../lib/api'
 import AppHeader from './components/AppHeader'
 
 interface Dog {
   id: string;
   name: string;
   breed?: string;
-  is_lost: boolean;
+  nose_print_count: number;
 }
 
 export default function HomePage() {
@@ -31,6 +31,10 @@ export default function HomePage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       if (session) fetchDogs(session.access_token)
+      else {
+        setDogs([])
+        setLoading(false)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -38,35 +42,12 @@ export default function HomePage() {
 
   const fetchDogs = async (token: string) => {
     try {
-      const res = await fetch(`${API_URL}/dogs`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (res.ok) {
-        setDogs(await res.json())
-      }
+      const data = await listDogs(token)
+      setDogs(data)
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const toggleLostStatus = async (dogId: string, currentStatus: boolean) => {
-    if (!session) return;
-    try {
-      const res = await fetch(`${API_URL}/dogs/${dogId}/lost-status`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ is_lost: !currentStatus })
-      })
-      if (res.ok) {
-        setDogs(dogs.map(d => d.id === dogId ? { ...d, is_lost: !currentStatus } : d))
-      }
-    } catch (e) {
-      console.error("Failed to update status")
     }
   }
 
@@ -89,7 +70,10 @@ export default function HomePage() {
           <div className="grid grid-cols-1 gap-4 mb-8">
             {dogs.length === 0 ? (
               <div className="text-center p-8 bg-zinc-900/50 rounded-2xl border border-zinc-800">
-                <p className="text-zinc-400">No dogs registered yet.</p>
+                <p className="text-zinc-400 mb-4">No dogs registered yet.</p>
+                <Link href="/enroll" className="text-blue-400 hover:text-blue-300 font-medium transition">
+                  Enroll your first dog →
+                </Link>
               </div>
             ) : (
               dogs.map(dog => (
@@ -97,41 +81,23 @@ export default function HomePage() {
                   <div>
                     <h2 className="text-xl font-semibold text-zinc-200">{dog.name}</h2>
                     {dog.breed && <p className="text-zinc-500 text-sm">{dog.breed}</p>}
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer relative">
-                      <span className="text-xs text-zinc-500 font-medium tracking-wide uppercase">
-                        {dog.is_lost ? 'Marked Lost' : 'Safe'}
-                      </span>
-                      <div className={`w-12 h-6 rounded-full transition-colors relative ${dog.is_lost ? 'bg-red-500' : 'bg-zinc-700'}`}>
-                        <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${dog.is_lost ? 'translate-x-6' : 'translate-x-0'}`} />
-                      </div>
-                      <input 
-                        type="checkbox" 
-                        className="sr-only" 
-                        checked={dog.is_lost} 
-                        onChange={() => toggleLostStatus(dog.id, dog.is_lost)} 
-                      />
-                    </label>
+                    <p className="text-zinc-600 text-xs mt-1">
+                      {dog.nose_print_count} nose print{dog.nose_print_count !== 1 ? 's' : ''} enrolled
+                    </p>
                   </div>
                 </div>
               ))
             )}
           </div>
-          
-          <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl mb-8 flex gap-3 text-blue-400/80 text-sm font-light">
-            <ShieldCheck size={24} className="shrink-0" />
-            <p><strong>Privacy note:</strong> Your dogs cannot be identified by the public unless you mark them as Lost using the toggle above.</p>
-          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mt-auto">
             <Link href="/enroll" className="flex items-center justify-center gap-2 p-4 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition">
               <Camera size={20} className="text-blue-400" />
-              <span className="font-medium text-zinc-200">Register New</span>
+              <span className="font-medium text-zinc-200">Enroll New Dog</span>
             </Link>
             <Link href="/identify" className="flex items-center justify-center gap-2 p-4 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition">
               <ScanFace size={20} className="text-emerald-400" />
-              <span className="font-medium text-zinc-200">Identify Found Dog</span>
+              <span className="font-medium text-zinc-200">Identify a Dog</span>
             </Link>
           </div>
         </div>
@@ -141,14 +107,14 @@ export default function HomePage() {
             CANID
           </h1>
           <p className="text-lg text-zinc-400 mb-10 text-center font-light leading-relaxed">
-            Just like a human fingerprint, every dog's nose print is completely unique. Our system identifies dogs instantly with a single scan.
+            Just like a human fingerprint, every dog&apos;s nose print is completely unique. Our system identifies dogs instantly with a single scan.
           </p>
 
           <div className="bg-zinc-900/50 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-zinc-800/50 mb-12 w-full relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none"></div>
             <h2 className="text-xl font-semibold mb-4 text-zinc-200">How it works</h2>
             <ol className="list-decimal list-inside space-y-3 text-zinc-400 font-light">
-              <li><strong className="text-zinc-200 font-medium">Enroll:</strong> Capture a clear photo of your dog's nose to extract the biometric signature.</li>
+              <li><strong className="text-zinc-200 font-medium">Enroll:</strong> Capture a clear photo of your dog&apos;s nose to extract the biometric signature.</li>
               <li><strong className="text-zinc-200 font-medium">Identify:</strong> Scan a dog later to match against the secure database.</li>
             </ol>
           </div>
@@ -160,7 +126,7 @@ export default function HomePage() {
             >
               <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               <Camera size={36} className="mb-4 text-blue-400 group-hover:scale-110 transition-transform duration-500" strokeWidth={1.5} />
-              <span className="font-semibold text-lg text-zinc-200 tracking-wide">Enroll Dog</span>
+              <span className="font-semibold text-lg text-zinc-200 tracking-wide">➕ Enroll Dog</span>
             </Link>
             <Link 
               href="/identify"
@@ -168,7 +134,7 @@ export default function HomePage() {
             >
               <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               <ScanFace size={36} className="mb-4 text-emerald-400 group-hover:scale-110 transition-transform duration-500" strokeWidth={1.5} />
-              <span className="font-semibold text-lg text-zinc-200 tracking-wide">Identify Dog</span>
+              <span className="font-semibold text-lg text-zinc-200 tracking-wide">🔍 Identify Dog</span>
             </Link>
           </div>
         </>

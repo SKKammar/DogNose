@@ -25,10 +25,10 @@ export default function LoginPage() {
       } else {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-        alert("Check your email for the confirmation link.")
       }
       
-      router.push('/')
+      // Redirect to enroll on successful auth
+      router.push('/enroll')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -78,6 +78,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
                 className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
                 placeholder="••••••••"
               />
