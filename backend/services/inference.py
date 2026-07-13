@@ -28,6 +28,13 @@ def init_models():
     """
     global detector_session, embedder_sessions
 
+    cwd = os.getcwd()
+    logger.info(f"App starting in directory: {cwd}")
+    if os.path.exists("models"):
+        logger.info(f"Contents of models/: {os.listdir('models')}")
+    else:
+        logger.error("Directory models/ not found!")
+
     if os.path.exists(DETECTOR_MODEL_PATH) and detector_session is None:
         logger.info(f"Loading detector model from {DETECTOR_MODEL_PATH}")
         detector_session = ort.InferenceSession(DETECTOR_MODEL_PATH)

@@ -4,7 +4,8 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install -r requirements.txt && chmod +x ../scripts/download_models.sh && cd .. && ./scripts/download_models.sh && cd backend
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && mkdir -p models && curl -L -o models/detector.onnx "https://github.com/SKKammar/DogNose/releases/download/v0.1.0-models/detector.onnx" && curl -L -o models/embedder.onnx "https://github.com/SKKammar/DogNose/releases/download/v0.1.0-models/embedder.onnx"
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
