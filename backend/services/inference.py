@@ -7,11 +7,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Model paths — these are relative to the working directory (backend/ on Render)
-DETECTOR_MODEL_PATH = os.getenv("DETECTOR_MODEL_PATH", "models/detector.onnx")
+DETECTOR_MODEL_PATH = os.getenv("DETECTOR_MODEL_PATH", "../models/detector.onnx")
 EMBEDDER_MODEL_PATHS = {
-    "v1": os.getenv("EMBEDDER_MODEL_PATH_V1", "models/embedder.onnx"),
+    "v1": os.getenv("EMBEDDER_MODEL_PATH_V1", "../models/embedder.onnx"),
     # Add new versions here as they become available
-    # "v2": os.getenv("EMBEDDER_MODEL_PATH_V2", "models/embedder_v2.onnx"),
+    # "v2": os.getenv("EMBEDDER_MODEL_PATH_V2", "../models/embedder_v2.onnx"),
 }
 
 from typing import Optional
@@ -30,10 +30,10 @@ def init_models():
 
     cwd = os.getcwd()
     logger.info(f"App starting in directory: {cwd}")
-    if os.path.exists("models"):
-        logger.info(f"Contents of models/: {os.listdir('models')}")
+    if os.path.exists("../models"):
+        logger.info(f"Contents of ../models/: {os.listdir('../models')}")
     else:
-        logger.error("Directory models/ not found!")
+        logger.error("Directory ../models/ not found!")
 
     if os.path.exists(DETECTOR_MODEL_PATH) and detector_session is None:
         logger.info(f"Loading detector model from {DETECTOR_MODEL_PATH}")

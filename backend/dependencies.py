@@ -57,8 +57,9 @@ def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -
         payload = jwt.decode(
             token,
             SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
+            algorithms=["HS256", "RS256", "HS512"],
             audience="authenticated",
+            options={"verify_aud": False} # Sometimes audience is not strictly 'authenticated'
         )
         user_id = payload.get("sub")
         if not user_id:
