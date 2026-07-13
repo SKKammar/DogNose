@@ -13,7 +13,7 @@ security = HTTPBearer()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+SUPABASE_JWT_PUBLIC_KEY = os.getenv("SUPABASE_JWT_PUBLIC_KEY", "").replace("\\n", "\n")
 
 
 def get_service_supabase() -> Client:
@@ -47,24 +47,16 @@ def get_anon_supabase() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 
+
 def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
-    """
-    Verify the Supabase JWT locally using the JWT secret.
-    Returns the user_id (sub claim) if valid.
-    This avoids a round-trip to Supabase for every authenticated request.
-    """
     token = credentials.credentials
     try:
-        header = jwt.get_unverified_header(token)
-        logger.warning(f"JWT Header: {header}")
-        
-        # PyJWT syntax
         payload = jwt.decode(
             token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256", "RS256", "HS512"],
+            SUPABASE_JWT_PUBLIC_KEY,          # use the public key, not the secret
+            algorithms=["ES256"],             # the algorithm your tokens actually use
             audience="authenticated",
-            options={"verify_signature": True, "verify_audience": False}
+            options={"verify_audience": False}  # keep if you want to skip audience check
         )
         user_id = payload.get("sub")
         if not user_id:
@@ -73,7 +65,6 @@ def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -
     except PyJWTError as e:
         logger.warning(f"JWT verification failed: {e}")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-
 
 def get_current_user_id(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
     """
