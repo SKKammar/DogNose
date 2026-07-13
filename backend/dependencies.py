@@ -13,7 +13,9 @@ security = HTTPBearer()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-SUPABASE_JWT_PUBLIC_KEY = os.getenv("SUPABASE_JWT_PUBLIC_KEY", "").replace("\\n", "\n")
+# Build the JWKS URL from your Supabase URL
+JWKS_URL = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
+jwks_client = jwt.PyJWKClient(JWKS_URL)
 
 
 def get_service_supabase() -> Client:
@@ -47,16 +49,17 @@ def get_anon_supabase() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 
-
 def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
     token = credentials.credentials
     try:
+        # Fetch the matching public key based on the token's 'kid'
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
         payload = jwt.decode(
             token,
-            SUPABASE_JWT_PUBLIC_KEY,          # use the public key, not the secret
-            algorithms=["ES256"],             # the algorithm your tokens actually use
+            signing_key.key,
+            algorithms=["ES256", "RS256", "HS256", "HS512"],
             audience="authenticated",
-            options={"verify_audience": False}  # keep if you want to skip audience check
+            options={"verify_audience": False}  # skip audience check if needed
         )
         user_id = payload.get("sub")
         if not user_id:
