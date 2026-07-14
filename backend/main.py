@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("uvicorn").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -44,22 +45,20 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# CORS MUST be first
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-origins = [
-    os.getenv("FRONTEND_URL", "http://localhost:3000"),
-    "https://*.vercel.app"
-]
 
-# CORS: allow origins for Vercel → Render cross-origin calls
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
 
 # Import and include routers
 from routers import dogs  # noqa: E402
