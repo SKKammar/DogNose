@@ -47,10 +47,15 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS: allow all origins for Vercel → Render cross-origin calls
+origins = [
+    os.getenv("FRONTEND_URL", "http://localhost:3000"),
+    "https://*.vercel.app"
+]
+
+# CORS: allow origins for Vercel → Render cross-origin calls
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,4 +94,4 @@ def health_check():
     """Health check endpoint for Render. Returns model readiness status."""
     from services.inference import models_ready
 
-    return {"status": "ok", "inference_ready": models_ready()}
+    return {"status": "ok", "models_loaded": models_ready()}

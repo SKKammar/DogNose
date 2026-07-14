@@ -65,8 +65,8 @@ def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
         return user_id
-    except PyJWTError as e:
-        logger.warning(f"JWT verification failed: {e}")
+    except Exception as e:
+        logger.error(f"JWT verification failed with exception: {str(e)}", exc_info=True)
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 def get_current_user_id(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:

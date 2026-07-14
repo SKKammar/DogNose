@@ -18,6 +18,7 @@ export async function fetchWithErrorHandling(url: string, options: RequestInit =
 
   try {
     const response = await fetch(url, {
+      cache: 'no-store',
       ...options,
       signal: controller.signal
     })

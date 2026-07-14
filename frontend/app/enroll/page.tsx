@@ -28,6 +28,7 @@ export default function EnrollPage() {
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [retakeIndex, setRetakeIndex] = useState<number | null>(null)
+  const [isWakingUp, setIsWakingUp] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -73,6 +74,8 @@ export default function EnrollPage() {
       }
       const token = session.access_token
 
+      const wakeTimer = setTimeout(() => setIsWakingUp(true), 3000)
+
       // 1. Create dog profile
       const dogData = await registerDog(name, breed || null, token)
 
@@ -114,6 +117,8 @@ export default function EnrollPage() {
     } catch (err: any) {
       setError(err)
       setStep('error')
+    } finally {
+      setIsWakingUp(false)
     }
   }
 
@@ -281,11 +286,15 @@ export default function EnrollPage() {
         {step === 'uploading' && (
           <motion.div key="uploading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center py-32 w-full max-w-md">
             <Loader2 className="animate-spin text-blue-500 mb-4" size={48} />
-            <h2 className="text-xl font-light text-zinc-200">ENROLLING</h2>
+            <h2 className="text-xl font-light text-zinc-200">
+              {isWakingUp ? "Waking up the matching engine…" : "ENROLLING"}
+            </h2>
             <p className="text-zinc-500 text-sm mt-2">
-              {uploadIndex > 0 
-                ? `Enrolling photo ${uploadIndex} of ${photos.length}…` 
-                : "Creating dog profile…"}
+              {isWakingUp
+                ? "(first request takes ~20s on free tier)"
+                : uploadIndex > 0 
+                  ? `Enrolling photo ${uploadIndex} of ${photos.length}…` 
+                  : "Creating dog profile…"}
             </p>
             <div className="w-48 h-1 bg-zinc-800 rounded-full mt-6 overflow-hidden">
               <motion.div 

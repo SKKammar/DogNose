@@ -24,7 +24,7 @@ You should already have:
 5. You should see `Success. No rows returned` — that's correct
 
 This creates:
-- `dogs` and `nose_prints` tables
+- `dogs` table with `embedding vector(512)`
 - pgvector index for fast similarity search
 - Row Level Security policies
 - `match_all_dogs()` and `match_lost_dogs()` functions
@@ -103,7 +103,7 @@ In **Settings → Environment Variables**, add:
 |-----|-------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
-| `NEXT_PUBLIC_API_URL` | Your Render URL from Step 2 (e.g., `https://dognose-backend.onrender.com`) |
+| `NEXT_PUBLIC_API_URL` | `https://<your-render-service>.onrender.com` (Your Render URL from Step 2) |
 
 > ⚠️ Do **not** include a trailing slash in `NEXT_PUBLIC_API_URL`.
 

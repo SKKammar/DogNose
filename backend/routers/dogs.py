@@ -21,7 +21,7 @@ router = APIRouter(prefix="/dogs", tags=["dogs"])
 limiter = Limiter(key_func=get_remote_address)
 
 # Configuration from environment
-MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "8"))
+MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
 MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 ALLOWED_UPLOAD_TYPES = os.getenv(
     "ALLOWED_UPLOAD_TYPES", "image/jpeg,image/png,image/webp"
@@ -60,8 +60,10 @@ class MatchCandidate(BaseModel):
 
 
 class IdentifyResponse(BaseModel):
-    result: str  # "match" or "no_match"
-    matches: List[MatchCandidate]
+    match: bool
+    message: str
+    confidence: Optional[float] = None
+    dog: Optional[MatchCandidate] = None
 
 
 # --- Image validation helper ---
@@ -70,21 +72,21 @@ async def validate_image(request: Request, file: UploadFile) -> bytes:
     """Validate uploaded image: check type, size, and decodability."""
     if file.content_type not in ALLOWED_UPLOAD_TYPES:
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_UPLOAD_TYPES)}",
         )
 
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > MAX_SIZE_BYTES:
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail=f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB.",
         )
 
     content = await file.read()
     if len(content) > MAX_SIZE_BYTES:
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail=f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB.",
         )
 
@@ -92,7 +94,7 @@ async def validate_image(request: Request, file: UploadFile) -> bytes:
     nparr = np.frombuffer(content, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if img is None:
-        raise HTTPException(status_code=400, detail="Invalid image file or format")
+        raise HTTPException(status_code=422, detail="Invalid image file or format")
 
     # Re-encode as JPEG for consistent processing
     success, buffer = cv2.imencode(".jpg", img)
@@ -115,7 +117,7 @@ def register_dog(
     """
     supabase = get_service_supabase()
     data = {
-        "owner_id": user_id,
+        "owner": user_id,
         "name": dog.name,
         "breed": dog.breed,
     }
@@ -137,39 +139,22 @@ def list_dogs(
     """
     supabase = get_service_supabase()
 
-    # Fetch dogs for this user
     dogs_res = (
         supabase.table("dogs")
-        .select("id, name, breed")
-        .eq("owner_id", user_id)
+        .select("id, name, breed, embedding")
+        .eq("owner", user_id)
         .execute()
     )
 
     if not dogs_res.data:
         return []
 
-    # Fetch nose_prints for these dogs to count them
-    dog_ids = [d["id"] for d in dogs_res.data]
-    counts_res = (
-        supabase.table("nose_prints")
-        .select("dog_id")
-        .in_("dog_id", dog_ids)
-        .execute()
-    )
-
-    # Build a count map from nose_prints rows
-    count_map: dict[str, int] = {}
-    if counts_res.data:
-        for row in counts_res.data:
-            did = row["dog_id"]
-            count_map[did] = count_map.get(did, 0) + 1
-
     return [
         DogListItem(
             id=d["id"],
             name=d["name"],
             breed=d.get("breed"),
-            nose_print_count=count_map.get(d["id"], 0),
+            nose_print_count=1 if d.get("embedding") else 0,
         )
         for d in dogs_res.data
     ]
@@ -195,7 +180,7 @@ async def enroll_dog(
         supabase.table("dogs")
         .select("id")
         .eq("id", dog_id)
-        .eq("owner_id", user_id)
+        .eq("owner", user_id)
         .execute()
     )
     if not dog_check.data:
@@ -214,17 +199,15 @@ async def enroll_dog(
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    # Store embedding
     data = {
-        "dog_id": dog_id,
         "embedding": embedding.tolist(),
         "embedding_version": ACTIVE_EMBEDDING_VERSION,
     }
 
     try:
-        res = supabase.table("nose_prints").insert(data).execute()
+        res = supabase.table("dogs").update(data).eq("id", dog_id).execute()
     except Exception as e:
-        logger.error(f"Failed to insert nose print: {e}")
+        logger.error(f"Failed to update dog embedding: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to store nose print embedding"
         )
@@ -232,7 +215,7 @@ async def enroll_dog(
     if not res.data:
         raise HTTPException(status_code=500, detail="Failed to enroll dog")
 
-    return {"nose_print_id": res.data[0]["id"]}
+    return {"nose_print_id": dog_id}
 
 
 @router.post("/identify")
@@ -276,7 +259,7 @@ async def identify_dog(
         raise HTTPException(status_code=500, detail="Database query failed")
 
     if not res.data:
-        return IdentifyResponse(result="no_match", matches=[])
+        return {"match": False, "message": "No matching dog found", "confidence": 0.0}
 
     matches = [
         MatchCandidate(
@@ -291,6 +274,6 @@ async def identify_dog(
 
     # Check if top result meets threshold
     if matches[0].similarity < MATCH_THRESHOLD:
-        return IdentifyResponse(result="no_match", matches=[])
+        return {"match": False, "message": "No matching dog found", "confidence": matches[0].similarity}
 
-    return IdentifyResponse(result="match", matches=matches)
+    return {"match": True, "message": "Match found", "confidence": matches[0].similarity, "dog": matches[0].dict()}

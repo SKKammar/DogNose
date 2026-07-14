@@ -5,7 +5,7 @@ services:
     region: oregon
     plan: free
     rootDir: backend
-    buildCommand: pip install -r requirements.txt && mkdir -p models && curl -L -o models/detector.onnx "https://github.com/SKKammar/DogNose/releases/download/v0.1.0-models/detector.onnx" && curl -L -o models/embedder.onnx "https://github.com/SKKammar/DogNose/releases/download/v0.1.0-models/embedder.onnx"
+    buildCommand: pip install -r requirements.txt && chmod +x ../scripts/download_models.sh && cd .. && ./scripts/download_models.sh && cd backend
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
@@ -14,6 +14,8 @@ services:
       - key: SUPABASE_ANON_KEY
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: FRONTEND_URL
         sync: false
       - key: PYTHON_VERSION
         value: "3.11.9"

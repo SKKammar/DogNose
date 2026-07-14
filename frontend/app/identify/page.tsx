@@ -19,8 +19,10 @@ interface MatchCandidate {
 }
 
 interface IdentifyResult {
-  result: string
-  matches: MatchCandidate[]
+  match: boolean
+  message: string
+  confidence?: number
+  dog?: MatchCandidate
 }
 
 const PROCESSING_STEPS = [
@@ -66,7 +68,7 @@ export default function IdentifyPage() {
     try {
       const data = await identifyNose(blob)
 
-      if (data.result === 'match' && data.matches?.length > 0) {
+      if (data.match && data.dog) {
         setResult(data)
         setStatus('match')
       } else {
@@ -226,47 +228,41 @@ export default function IdentifyPage() {
             
             <h2 className="text-3xl font-bold text-white mb-8 tracking-tight">Match Found</h2>
 
-            {/* Top-3 Match Cards */}
+            {/* Top Match Card */}
             <div className="w-full space-y-4 mb-8">
-              {result.matches.map((match, i) => (
+              {result.dog && (
                 <motion.div 
-                  key={match.dog_id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.15 }}
-                  className={`bg-zinc-900/50 backdrop-blur-sm rounded-2xl border overflow-hidden ${
-                    i === 0 ? 'border-emerald-500/30 ring-1 ring-emerald-500/10' : 'border-zinc-800'
-                  }`}
+                  className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-emerald-500/30 ring-1 ring-emerald-500/10 overflow-hidden"
                 >
                   <div className="p-5">
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-zinc-200 text-lg">{match.name}</span>
-                          {i === 0 && (
-                            <span className="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 font-medium">
-                              ✓ Best Match
-                            </span>
-                          )}
+                          <span className="font-semibold text-zinc-200 text-lg">{result.dog.name}</span>
+                          <span className="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 font-medium">
+                            ✓ Best Match
+                          </span>
                         </div>
-                        {match.breed && <span className="text-zinc-500 text-sm">{match.breed}</span>}
+                        {result.dog.breed && <span className="text-zinc-500 text-sm">{result.dog.breed}</span>}
                       </div>
-                      <span className={`text-lg font-bold ${getConfidenceTextColor(match.similarity)}`}>
-                        {(match.similarity * 100).toFixed(1)}%
+                      <span className={`text-lg font-bold ${getConfidenceTextColor(result.dog.similarity)}`}>
+                        {(result.dog.similarity * 100).toFixed(1)}%
                       </span>
                     </div>
                     {/* Confidence bar */}
                     <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
-                        animate={{ width: `${match.similarity * 100}%` }}
-                        transition={{ duration: 1, delay: 0.3 + i * 0.15, ease: "easeOut" }}
-                        className={`h-full rounded-full ${getConfidenceColor(match.similarity)}`}
+                        animate={{ width: `${result.dog.similarity * 100}%` }}
+                        transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
+                        className={`h-full rounded-full ${getConfidenceColor(result.dog.similarity)}`}
                       />
                     </div>
                   </div>
                 </motion.div>
-              ))}
+              )}
             </div>
 
             {/* Action buttons */}
