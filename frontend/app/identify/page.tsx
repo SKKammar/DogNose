@@ -14,6 +14,12 @@ interface MatchCandidate {
   dog_id: string
   name: string
   breed?: string
+  age?: number
+  sex?: string
+  color_markings?: string
+  owner_name?: string
+  owner_phone?: string
+  owner_email?: string
   similarity: number
   is_match: boolean
 }
@@ -240,14 +246,28 @@ export default function IdentifyPage() {
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-zinc-200 text-lg">{result.dog.name}</span>
+                          <span className="font-semibold text-zinc-200 text-xl">{result.dog.name}</span>
                           <span className="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 font-medium">
                             ✓ Best Match
                           </span>
                         </div>
-                        {result.dog.breed && <span className="text-zinc-500 text-sm">{result.dog.breed}</span>}
+                        <div className="text-zinc-400 text-sm space-y-1 mt-3">
+                          {result.dog.breed && <p><span className="text-zinc-500">Breed:</span> {result.dog.breed}</p>}
+                          {result.dog.age !== undefined && result.dog.age !== null && <p><span className="text-zinc-500">Age:</span> {result.dog.age} yrs</p>}
+                          {result.dog.sex && <p><span className="text-zinc-500">Sex:</span> {result.dog.sex}</p>}
+                          {result.dog.color_markings && <p><span className="text-zinc-500">Color/Markings:</span> {result.dog.color_markings}</p>}
+                          
+                          {(result.dog.owner_name || result.dog.owner_phone || result.dog.owner_email) && (
+                            <div className="mt-4 pt-3 border-t border-zinc-800">
+                              <p className="text-zinc-300 font-medium mb-1">Owner Contact</p>
+                              {result.dog.owner_name && <p><span className="text-zinc-500">Name:</span> {result.dog.owner_name}</p>}
+                              {result.dog.owner_phone && <p><span className="text-zinc-500">Phone:</span> {result.dog.owner_phone}</p>}
+                              {result.dog.owner_email && <p><span className="text-zinc-500">Email:</span> {result.dog.owner_email}</p>}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <span className={`text-lg font-bold ${getConfidenceTextColor(result.dog.similarity)}`}>
+                      <span className={`text-xl font-bold ${getConfidenceTextColor(result.dog.similarity)}`}>
                         {(result.dog.similarity * 100).toFixed(1)}%
                       </span>
                     </div>

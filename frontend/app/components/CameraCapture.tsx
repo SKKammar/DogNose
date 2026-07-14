@@ -8,7 +8,7 @@ interface CameraCaptureProps {
   remainingPhotos?: number
 }
 
-export default function CameraCapture({ onCapture, isScanning = false, remainingPhotos = 3 }: CameraCaptureProps) {
+export default function CameraCapture({ onCapture, isScanning = false, remainingPhotos = Infinity }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   
@@ -82,7 +82,7 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'))
-      onCapture(files.slice(0, remainingPhotos))
+      onCapture(files)
     }
   }
 
@@ -103,7 +103,7 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
-      onCapture(files.slice(0, remainingPhotos))
+      onCapture(files)
     }
   }
 

@@ -36,12 +36,28 @@ IDENTIFY_RATE_LIMIT = os.getenv("IDENTIFY_RATE_LIMIT", "10/minute")
 class DogCreate(BaseModel):
     name: str
     breed: Optional[str] = None
+    age: Optional[float] = None
+    sex: Optional[str] = None
+    color_markings: Optional[str] = None
+    owner_name: Optional[str] = None
+    owner_phone: Optional[str] = None
+    owner_email: Optional[str] = None
+    microchip_id: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class DogResponse(BaseModel):
     id: str
     name: str
     breed: Optional[str] = None
+    age: Optional[float] = None
+    sex: Optional[str] = None
+    color_markings: Optional[str] = None
+    owner_name: Optional[str] = None
+    owner_phone: Optional[str] = None
+    owner_email: Optional[str] = None
+    microchip_id: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class DogListItem(BaseModel):
@@ -55,6 +71,12 @@ class MatchCandidate(BaseModel):
     dog_id: str
     name: str
     breed: Optional[str] = None
+    age: Optional[float] = None
+    sex: Optional[str] = None
+    color_markings: Optional[str] = None
+    owner_name: Optional[str] = None
+    owner_phone: Optional[str] = None
+    owner_email: Optional[str] = None
     similarity: float
     is_match: bool
 
@@ -120,6 +142,14 @@ def register_dog(
         "owner": user_id,
         "name": dog.name,
         "breed": dog.breed,
+        "age": dog.age,
+        "sex": dog.sex,
+        "color_markings": dog.color_markings,
+        "owner_name": dog.owner_name,
+        "owner_phone": dog.owner_phone,
+        "owner_email": dog.owner_email,
+        "microchip_id": dog.microchip_id,
+        "notes": dog.notes,
     }
 
     res = supabase.table("dogs").insert(data).execute()
@@ -127,7 +157,19 @@ def register_dog(
         raise HTTPException(status_code=500, detail="Failed to create dog")
 
     row = res.data[0]
-    return DogResponse(id=row["id"], name=row["name"], breed=row.get("breed"))
+    return DogResponse(
+        id=row["id"],
+        name=row["name"],
+        breed=row.get("breed"),
+        age=row.get("age"),
+        sex=row.get("sex"),
+        color_markings=row.get("color_markings"),
+        owner_name=row.get("owner_name"),
+        owner_phone=row.get("owner_phone"),
+        owner_email=row.get("owner_email"),
+        microchip_id=row.get("microchip_id"),
+        notes=row.get("notes"),
+    )
 
 
 @router.get("", response_model=List[DogListItem])
@@ -266,6 +308,12 @@ async def identify_dog(
             dog_id=row["dog_id"],
             name=row["name"],
             breed=row.get("breed"),
+            age=row.get("age"),
+            sex=row.get("sex"),
+            color_markings=row.get("color_markings"),
+            owner_name=row.get("owner_name"),
+            owner_phone=row.get("owner_phone"),
+            owner_email=row.get("owner_email"),
             similarity=round(float(row["similarity"]), 4),
             is_match=float(row["similarity"]) >= MATCH_THRESHOLD,
         )

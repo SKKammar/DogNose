@@ -22,6 +22,15 @@ export default function EnrollPage() {
   const [photos, setPhotos] = useState<PhotoStatus[]>([])
   const [name, setName] = useState('')
   const [breed, setBreed] = useState('')
+  const [age, setAge] = useState<number | ''>('')
+  const [sex, setSex] = useState('Unknown')
+  const [colorMarkings, setColorMarkings] = useState('')
+  const [ownerName, setOwnerName] = useState('')
+  const [ownerPhone, setOwnerPhone] = useState('')
+  const [ownerEmail, setOwnerEmail] = useState('')
+  const [microchipId, setMicrochipId] = useState('')
+  const [notes, setNotes] = useState('')
+  const [showOptional, setShowOptional] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
   const [uploadIndex, setUploadIndex] = useState(0)
   const [enrolledDogName, setEnrolledDogName] = useState('')
@@ -48,10 +57,8 @@ export default function EnrollPage() {
         return updated
       })
       setRetakeIndex(null)
-    } else if (photos.length < 3) {
-      const newPhotos = newBlobs
-        .slice(0, 3 - photos.length)
-        .map(b => ({ blob: b, status: 'pending' as const }))
+    } else {
+      const newPhotos = newBlobs.map(b => ({ blob: b, status: 'pending' as const }))
       setPhotos(prev => [...prev, ...newPhotos])
     }
   }
@@ -77,7 +84,18 @@ export default function EnrollPage() {
       const wakeTimer = setTimeout(() => setIsWakingUp(true), 3000)
 
       // 1. Create dog profile
-      const dogData = await registerDog(name, breed || null, token)
+      const dogData = await registerDog({
+        name,
+        breed: breed || null,
+        age: age === '' ? null : Number(age),
+        sex,
+        color_markings: colorMarkings || null,
+        owner_name: ownerName || null,
+        owner_phone: ownerPhone || null,
+        owner_email: ownerEmail || null,
+        microchip_id: microchipId || null,
+        notes: notes || null
+      }, token)
 
       // 2. Upload each nose print sequentially
       for (let i = 0; i < photos.length; i++) {
@@ -194,18 +212,121 @@ export default function EnrollPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-1">Breed (Optional)</label>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1">Breed <span className="text-red-400">*</span></label>
                   <input 
                     type="text" 
+                    required
                     value={breed} 
                     onChange={e => setBreed(e.target.value)} 
                     className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" 
-                    placeholder="e.g. Golden Retriever" 
+                    placeholder="e.g. Labrador Retriever" 
                   />
                 </div>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-zinc-400 mb-1">Age (Years) <span className="text-red-400">*</span></label>
+                    <input 
+                      type="number" 
+                      required
+                      step="0.1"
+                      min="0"
+                      value={age} 
+                      onChange={e => setAge(e.target.value === '' ? '' : Number(e.target.value))} 
+                      className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" 
+                      placeholder="e.g. 1.5" 
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-zinc-400 mb-1">Sex <span className="text-red-400">*</span></label>
+                    <select 
+                      value={sex}
+                      onChange={e => setSex(e.target.value)}
+                      className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Unknown">Unknown</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1">Color / Markings <span className="text-red-400">*</span></label>
+                  <input 
+                    type="text" 
+                    required
+                    value={colorMarkings} 
+                    onChange={e => setColorMarkings(e.target.value)} 
+                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" 
+                    placeholder="e.g. Golden with white chest patch" 
+                  />
+                </div>
+
+                <div className="border-t border-zinc-800 pt-4 mt-2">
+                  <button 
+                    onClick={() => setShowOptional(!showOptional)}
+                    className="w-full flex items-center justify-between text-sm text-zinc-400 hover:text-zinc-200 transition"
+                  >
+                    <span>Add owner details (optional)</span>
+                    <span className="text-xl leading-none">{showOptional ? '−' : '+'}</span>
+                  </button>
+                  
+                  {showOptional && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Owner Name</label>
+                        <input 
+                          type="text" 
+                          value={ownerName} 
+                          onChange={e => setOwnerName(e.target.value)} 
+                          className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" 
+                        />
+                      </div>
+                      <div className="flex gap-4">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-zinc-400 mb-1">Phone</label>
+                          <input 
+                            type="tel" 
+                            value={ownerPhone} 
+                            onChange={e => setOwnerPhone(e.target.value)} 
+                            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" 
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-zinc-400 mb-1">Email</label>
+                          <input 
+                            type="email" 
+                            value={ownerEmail} 
+                            onChange={e => setOwnerEmail(e.target.value)} 
+                            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" 
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Microchip ID</label>
+                        <input 
+                          type="text" 
+                          value={microchipId} 
+                          onChange={e => setMicrochipId(e.target.value)} 
+                          className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Notes</label>
+                        <textarea 
+                          value={notes} 
+                          onChange={e => setNotes(e.target.value)} 
+                          rows={3}
+                          className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 transition resize-none" 
+                          placeholder="Special characteristics or identifying marks"
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+
                 <button 
-                  onClick={() => { if (name.trim()) setStep('capture') }}
-                  disabled={!name.trim()}
+                  onClick={() => { if (name.trim() && breed.trim() && age !== '' && colorMarkings.trim()) setStep('capture') }}
+                  disabled={!name.trim() || !breed.trim() || age === '' || !colorMarkings.trim()}
                   className="w-full py-4 mt-4 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition shadow-[0_0_15px_rgba(37,99,235,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Next — Capture Photos
@@ -236,16 +357,16 @@ export default function EnrollPage() {
             <p className="text-center text-zinc-400 mb-6 font-light">
               {retakeIndex !== null 
                 ? `Capture a replacement for photo ${retakeIndex + 1}`
-                : "Capture clear photos of the dog's nose (up to 3)."
+                : "Capture clear photos of the dog's nose (unlimited allowed)."
               }
             </p>
-            <CameraCapture onCapture={handleCapture} remainingPhotos={retakeIndex !== null ? 1 : 3 - photos.length} />
+            <CameraCapture onCapture={handleCapture} remainingPhotos={retakeIndex !== null ? 1 : Infinity} />
             
             {photos.length > 0 && (
               <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-zinc-300 text-sm font-medium">Captured Photos</h3>
-                  <span className="text-xs font-medium px-2 py-1 bg-zinc-800 text-zinc-400 rounded-full">{photos.length} / 3</span>
+                  <span className="text-xs font-medium px-2 py-1 bg-zinc-800 text-zinc-400 rounded-full">{photos.length} Total</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
                   {photos.map((photo, idx) => (
@@ -319,6 +440,15 @@ export default function EnrollPage() {
                   setStep('details')
                   setName('')
                   setBreed('')
+                  setAge('')
+                  setSex('Unknown')
+                  setColorMarkings('')
+                  setOwnerName('')
+                  setOwnerPhone('')
+                  setOwnerEmail('')
+                  setMicrochipId('')
+                  setNotes('')
+                  setShowOptional(false)
                   setPhotos([])
                   setEnrolledDogName('')
                 }}

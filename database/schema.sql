@@ -14,6 +14,14 @@ CREATE TABLE IF NOT EXISTS dogs (
     owner UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     breed TEXT,
+    age NUMERIC,
+    sex TEXT,
+    color_markings TEXT,
+    owner_name TEXT,
+    owner_phone TEXT,
+    owner_email TEXT,
+    microchip_id TEXT,
+    notes TEXT,
     embedding vector(512),
     embedding_version TEXT DEFAULT 'v1',
     is_lost BOOLEAN NOT NULL DEFAULT false,
@@ -64,6 +72,12 @@ RETURNS TABLE (
     dog_id UUID,
     name TEXT,
     breed TEXT,
+    age NUMERIC,
+    sex TEXT,
+    color_markings TEXT,
+    owner_name TEXT,
+    owner_phone TEXT,
+    owner_email TEXT,
     similarity FLOAT
 )
 SECURITY DEFINER
@@ -77,6 +91,12 @@ BEGIN
             d.id AS dog_id,
             d.name,
             d.breed,
+            d.age,
+            d.sex,
+            d.color_markings,
+            d.owner_name,
+            d.owner_phone,
+            d.owner_email,
             1 - (d.embedding <=> query_embedding) AS similarity,
             ROW_NUMBER() OVER (
                 PARTITION BY d.id
@@ -91,6 +111,12 @@ BEGIN
         rm.dog_id,
         rm.name,
         rm.breed,
+        rm.age,
+        rm.sex,
+        rm.color_markings,
+        rm.owner_name,
+        rm.owner_phone,
+        rm.owner_email,
         rm.similarity
     FROM ranked_matches rm
     WHERE rm.rn = 1

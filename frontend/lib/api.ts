@@ -64,17 +64,30 @@ export async function fetchWithErrorHandling(url: string, options: RequestInit =
 
 // --- Typed API functions ---
 
+export interface DogDetails {
+  name: string
+  breed: string | null
+  age: number | null
+  sex: string | null
+  color_markings: string | null
+  owner_name: string | null
+  owner_phone: string | null
+  owner_email: string | null
+  microchip_id: string | null
+  notes: string | null
+}
+
 /**
  * Register a new dog profile.
  */
-export async function registerDog(name: string, breed: string | null, token: string) {
+export async function registerDog(details: DogDetails, token: string) {
   const res = await fetchWithErrorHandling(`${API_URL}/dogs`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ name, breed: breed || null })
+    body: JSON.stringify(details)
   })
   return res.json()
 }
