@@ -26,7 +26,7 @@ MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 ALLOWED_UPLOAD_TYPES = os.getenv(
     "ALLOWED_UPLOAD_TYPES", "image/jpeg,image/png,image/webp"
 ).split(",")
-MATCH_THRESHOLD = float(os.getenv("MATCH_THRESHOLD", "0.75"))
+MATCH_THRESHOLD = float(os.getenv("MATCH_THRESHOLD", "0.62"))
 ACTIVE_EMBEDDING_VERSION = os.getenv("ACTIVE_EMBEDDING_VERSION", "v1")
 IDENTIFY_RATE_LIMIT = os.getenv("IDENTIFY_RATE_LIMIT", "10/minute")
 
@@ -207,15 +207,13 @@ def list_dogs(
 async def enroll_dog(
     request: Request,
     dog_id: str,
-    nose_image: UploadFile = File(...),
+    nose_images: List[UploadFile] = File(...),
     user_id: str = Depends(get_current_user_id),
 ):
     """
-    Enroll a nose photo for a dog. Runs ML pipeline and stores embedding.
-    Field name is 'nose_image' to match the frontend FormData key.
+    Enroll multiple nose photos for a dog. Runs ML pipeline on each,
+    averages the valid embeddings, and stores the centroid embedding.
     """
-    image_bytes = await validate_image(request, nose_image)
-
     # Verify the dog belongs to this user
     supabase = get_service_supabase()
     dog_check = (
@@ -230,19 +228,34 @@ async def enroll_dog(
             status_code=403, detail="Dog not found or you don't own this dog"
         )
 
-    # Run ML pipeline
-    try:
-        embedding = extract_embedding(image_bytes, ACTIVE_EMBEDDING_VERSION)
-    except ValueError as e:
-        msg = str(e)
-        if "no_nose_detected" in msg:
-            raise HTTPException(status_code=422, detail="no_nose_detected")
-        raise HTTPException(status_code=422, detail=msg)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    valid_embeddings = []
+    
+    for nose_image in nose_images:
+        try:
+            image_bytes = await validate_image(request, nose_image)
+            embedding = extract_embedding(image_bytes, ACTIVE_EMBEDDING_VERSION)
+            valid_embeddings.append(embedding)
+        except Exception as e:
+            # We skip invalid or undetectable noses and try the next photo
+            logger.warning(f"Skipping an uploaded photo for {dog_id}: {e}")
+            continue
+
+    if not valid_embeddings:
+        raise HTTPException(
+            status_code=422, detail="No valid nose prints detected in any of the uploaded photos."
+        )
+
+    # Calculate centroid embedding
+    embeddings_matrix = np.vstack(valid_embeddings)
+    avg_embedding = np.mean(embeddings_matrix, axis=0)
+    
+    # L2 normalize
+    norm = np.linalg.norm(avg_embedding)
+    if norm > 0:
+        avg_embedding = avg_embedding / norm
 
     data = {
-        "embedding": embedding.tolist(),
+        "embedding": avg_embedding.tolist(),
         "embedding_version": ACTIVE_EMBEDDING_VERSION,
     }
 
@@ -257,7 +270,7 @@ async def enroll_dog(
     if not res.data:
         raise HTTPException(status_code=500, detail="Failed to enroll dog")
 
-    return {"nose_print_id": dog_id}
+    return {"nose_print_id": dog_id, "photos_processed": len(valid_embeddings)}
 
 
 @router.post("/identify")

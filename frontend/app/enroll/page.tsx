@@ -97,37 +97,19 @@ export default function EnrollPage() {
         notes: notes || null
       }, token)
 
-      // 2. Upload each nose print sequentially
-      for (let i = 0; i < photos.length; i++) {
-        setUploadIndex(i + 1)
-        setPhotos(prev => {
-          const updated = [...prev]
-          updated[i] = { ...updated[i], status: 'uploading' }
-          return updated
-        })
-
-        try {
-          await enrollNose(dogData.id, photos[i].blob, token)
-          setPhotos(prev => {
-            const updated = [...prev]
-            updated[i] = { ...updated[i], status: 'success' }
-            return updated
-          })
-        } catch (enrollErr: any) {
-          const detail = enrollErr?.message || enrollErr?.detail || 'Unknown error'
-          if (detail === 'no_nose_detected') {
-            setPhotos(prev => {
-              const updated = [...prev]
-              updated[i] = { ...updated[i], status: 'error', error: `No nose found in photo ${i + 1} — retake it` }
-              return updated
-            })
-            // Jump back to capture mode for retake
-            setRetakeIndex(i)
-            setStep('capture')
-            return
-          }
-          throw enrollErr
+      // 2. Upload all nose prints in a single batch request
+      const blobs = photos.map(p => p.blob)
+      try {
+        await enrollNose(dogData.id, blobs, token)
+        setPhotos(prev => prev.map(p => ({ ...p, status: 'success' })))
+      } catch (enrollErr: any) {
+        const detail = enrollErr?.message || enrollErr?.detail || 'Unknown error'
+        if (detail.includes('No valid nose prints detected')) {
+           setPhotos(prev => prev.map(p => ({ ...p, status: 'error', error: 'No nose found in any photo — retake' })))
+           setStep('capture')
+           return
         }
+        throw enrollErr
       }
 
       setEnrolledDogName(name)
@@ -357,7 +339,7 @@ export default function EnrollPage() {
             <p className="text-center text-zinc-400 mb-6 font-light">
               {retakeIndex !== null 
                 ? `Capture a replacement for photo ${retakeIndex + 1}`
-                : "Capture clear photos of the dog's nose (unlimited allowed)."
+                : "For best results, upload 5–10 photos from different angles and lighting conditions."
               }
             </p>
             <CameraCapture onCapture={handleCapture} remainingPhotos={retakeIndex !== null ? 1 : Infinity} />

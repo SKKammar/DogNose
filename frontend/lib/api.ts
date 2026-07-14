@@ -93,15 +93,21 @@ export async function registerDog(details: DogDetails, token: string) {
 }
 
 /**
- * Enroll a nose photo for a dog. Sends as multipart with field name 'nose_image'.
+ * Upload one or multiple nose prints for a registered dog.
  */
-export async function enrollNose(dogId: string, imageBlob: Blob, token: string) {
-  const form = new FormData()
-  form.append('nose_image', imageBlob, 'nose.jpg')
+export async function enrollNose(dogId: string, blobs: Blob[], token: string) {
+  const formData = new FormData()
+  blobs.forEach((blob, index) => {
+    formData.append('nose_images', blob, `nose_${index}.jpg`)
+  })
+
   const res = await fetchWithErrorHandling(`${API_URL}/dogs/${dogId}/enroll`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` },
-    body: form,
+    headers: {
+      'Authorization': `Bearer ${token}`
+      // Note: Do not set Content-Type, browser will set it with boundary for FormData
+    },
+    body: formData
   })
   return res.json()
 }
