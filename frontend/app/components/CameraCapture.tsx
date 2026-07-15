@@ -23,7 +23,11 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
         stream.getTracks().forEach(t => t.stop())
       }
       const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1080 } }
+        video: { 
+          facingMode: 'environment', 
+          width: { ideal: 1080 },
+          aspectRatio: { ideal: 0.75 } 
+        }
       })
       setStream(newStream)
       if (videoRef.current) {
@@ -113,7 +117,7 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center p-10 border rounded-3xl w-full max-w-md mx-auto backdrop-blur-sm relative overflow-hidden transition ${isDragging ? 'border-blue-500 bg-zinc-800/80' : 'border-zinc-800 bg-zinc-900/50'}`}
+        className={`flex flex-col items-center justify-center p-10 border rounded-3xl w-full max-w-md mx-auto aspect-[3/4] backdrop-blur-sm relative overflow-hidden transition ${isDragging ? 'border-[var(--color-accent)] bg-[var(--color-bg)]' : 'border-[var(--color-border)] bg-[var(--color-surface)]'}`}
       >
         <Upload className={`${isDragging ? 'text-blue-400' : 'text-zinc-500'} mb-4 transition`} size={48} strokeWidth={1} />
         <p className="text-zinc-400 mb-6 text-center font-light">
