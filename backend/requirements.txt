@@ -10,3 +10,4 @@ supabase==2.4.2
 PyJWT[crypto]==2.8.0
 slowapi==0.1.9
 python-dotenv==1.0.1
+cachetools==5.3.3

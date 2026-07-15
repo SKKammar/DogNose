@@ -17,5 +17,7 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: "dog-photos"
       - key: PYTHON_VERSION
         value: "3.11.9"

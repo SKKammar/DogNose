@@ -19,9 +19,10 @@ You should already have:
 ### 1.1 Run the schema
 1. Go to your [Supabase Dashboard](https://supabase.com/dashboard)
 2. Navigate to **SQL Editor** → **New Query**
-3. Copy the **entire** contents of [`database/schema.sql`](database/schema.sql) and paste it
+3. Copy the **entire** contents of [`database/01_schema.sql`](database/01_schema.sql) and paste it
 4. Click **Run** (or press Ctrl+Enter)
-5. You should see `Success. No rows returned` — that's correct
+5. Repeat the same process for `database/02_rls_policies.sql`, `database/03_add_lost_status.sql`, and `database/04_feature_upgrade.sql`
+6. You should see `Success. No rows returned` — that's correct
 
 This creates:
 - `dogs` table with `embedding vector(512)`
@@ -41,6 +42,11 @@ This creates:
 | **JWT Secret** | `Settings → API → JWT Settings → JWT Secret` |
 
 > ⚠️ **Never commit** the `service_role` key or JWT secret to your repo. They go in environment variables only.
+
+### 1.3 Create Storage Bucket
+1. Go to **Storage → New Bucket**
+2. Name it `dog-photos` and set it to **Public**
+3. This is used to store the dog profile photos.
 
 ---
 
@@ -70,6 +76,8 @@ In the Render dashboard, go to **Environment** and add:
 | `SUPABASE_ANON_KEY` | Your Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service role key |
 | `SUPABASE_JWT_SECRET` | Your Supabase JWT secret |
+| `SUPABASE_STORAGE_BUCKET` | `dog-photos` |
+| `FRONTEND_URL` | `https://<your-vercel-domain>.vercel.app` (optional, for CORS if strict) |
 
 ### 2.3 Deploy
 1. Click **Create Web Service** (or trigger a manual deploy)
@@ -104,6 +112,7 @@ In **Settings → Environment Variables**, add:
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
 | `NEXT_PUBLIC_API_URL` | `https://<your-render-service>.onrender.com` (Your Render URL from Step 2) |
+| `NEXT_PUBLIC_APP_URL` | `https://<your-vercel-domain>.vercel.app` (Used for Web Share API) |
 
 > ⚠️ Do **not** include a trailing slash in `NEXT_PUBLIC_API_URL`.
 

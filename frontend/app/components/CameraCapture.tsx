@@ -153,17 +153,11 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
       )}
       
       {/* Cinematic HUD Overlay */}
-      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-        <div className="w-56 h-56 border border-white/20 rounded-2xl relative overflow-hidden bg-white/5 backdrop-blur-[1px]">
-          {/* Corner brackets */}
-          <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-blue-400 rounded-tl-xl"></div>
-          <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-blue-400 rounded-tr-xl"></div>
-          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-blue-400 rounded-bl-xl"></div>
-          <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-blue-400 rounded-br-xl"></div>
-          
+      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center pt-8">
+        <div className="w-64 h-80 border-2 border-dashed border-[var(--color-accent)]/70 rounded-[100px] relative overflow-hidden bg-black/10 backdrop-blur-[1px] shadow-[0_0_30px_rgba(79,156,249,0.15)]">
           {/* Scan line animation */}
           {isScanning && (
-            <div className="absolute left-0 right-0 h-1 bg-blue-500/80 shadow-[0_0_15px_rgba(59,130,246,0.8)] animate-scan"></div>
+            <div className="absolute left-0 right-0 h-1 bg-[var(--color-accent)]/80 shadow-[0_0_15px_rgba(79,156,249,0.8)] animate-scan"></div>
           )}
         </div>
       </div>
@@ -175,9 +169,9 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
         <button 
           onClick={capture} 
           disabled={isScanning}
-          className={`w-20 h-20 rounded-full border-2 p-1 transition duration-300 ${isScanning ? 'border-zinc-600' : 'border-blue-400'}`}
+          className={`w-20 h-20 rounded-full border-4 p-1 transition duration-300 ${isScanning ? 'border-[var(--color-border)]' : 'border-[var(--color-accent)]'}`}
         >
-          <div className={`w-full h-full rounded-full transition-all duration-300 ${isScanning ? 'bg-zinc-700' : 'bg-white hover:bg-zinc-200 active:scale-90'}`}></div>
+          <div className={`w-full h-full rounded-full transition-all duration-300 ${isScanning ? 'bg-[var(--color-border)]' : 'bg-white hover:bg-zinc-200 active:scale-90'}`}></div>
         </button>
         <div className="w-12 h-12"></div>
       </div>

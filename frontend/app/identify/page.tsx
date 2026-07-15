@@ -1,12 +1,12 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
 import CameraCapture from '../components/CameraCapture'
-import { Loader2, Fingerprint, ChevronLeft } from 'lucide-react'
+import { Loader2, Fingerprint, ChevronLeft, Camera, Phone, Mail, Copy, AlertTriangle, PawPrint } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { identifyNose, ApiError } from '../../lib/api'
-import AppHeader from '../components/AppHeader'
 import NetworkError from '../components/NetworkError'
+import { toast } from 'sonner'
 
 type IdentifyStatus = 'idle' | 'processing' | 'match' | 'no_match' | 'error'
 
@@ -20,6 +20,8 @@ interface MatchCandidate {
   owner_name?: string
   owner_phone?: string
   owner_email?: string
+  profile_photo_url?: string
+  microchip_id?: string
   similarity: number
   is_match: boolean
 }
@@ -31,22 +33,33 @@ interface IdentifyResult {
   dog?: MatchCandidate
 }
 
-const PROCESSING_STEPS = [
-  { icon: '🔍', label: 'Detecting nose...' },
-  { icon: '🧬', label: 'Extracting features...' },
-  { icon: '🔎', label: 'Matching against database...' },
-]
-
 export default function IdentifyPage() {
   const [status, setStatus] = useState<IdentifyStatus>('idle')
   const [result, setResult] = useState<IdentifyResult | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [processingStep, setProcessingStep] = useState(0)
   const [isWaking, setIsWaking] = useState(false)
+  const [stats, setStats] = useState({ registered_dogs: 0 })
+  const [showTips, setShowTips] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [reportNote, setReportNote] = useState('')
+  
   const wakeTimerRef = useRef<NodeJS.Timeout | null>(null)
   const stepTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Animated processing step sequence
+  useEffect(() => {
+    fetch('/api/stats')
+      .then(res => res.json())
+      .then(data => setStats(data))
+      .catch(() => {})
+  }, [])
+
+  const PROCESSING_STEPS = [
+    { icon: <ScanBox />, label: 'Locating nose...' },
+    { icon: <Waveform />, label: 'Extracting biometric signature...' },
+    { icon: <Loader2 className="animate-spin text-[var(--color-accent)]" />, label: `Searching ${stats.registered_dogs || '...'} registered dogs...` },
+  ]
+
   useEffect(() => {
     if (status === 'processing') {
       setProcessingStep(0)
@@ -56,7 +69,7 @@ export default function IdentifyPage() {
         if (step < PROCESSING_STEPS.length) {
           setProcessingStep(step)
         }
-      }, 1000)
+      }, 1500)
 
       wakeTimerRef.current = setTimeout(() => setIsWaking(true), 8000)
     }
@@ -64,7 +77,7 @@ export default function IdentifyPage() {
       if (stepTimerRef.current) clearInterval(stepTimerRef.current)
       if (wakeTimerRef.current) clearTimeout(wakeTimerRef.current)
     }
-  }, [status])
+  }, [status, stats.registered_dogs])
 
   const handleCapture = async (blobData: Blob | Blob[]) => {
     const blob = Array.isArray(blobData) ? blobData[0] : blobData
@@ -73,7 +86,6 @@ export default function IdentifyPage() {
 
     try {
       const data = await identifyNose(blob)
-
       if (data.match && data.dog) {
         setResult(data)
         setStatus('match')
@@ -86,25 +98,41 @@ export default function IdentifyPage() {
     }
   }
 
-  const getConfidenceColor = (similarity: number): string => {
-    if (similarity >= 0.85) return 'bg-emerald-500'
-    if (similarity >= 0.75) return 'bg-yellow-500'
-    return 'bg-zinc-600'
+  const handleCopy = () => {
+    if (!result?.dog) return
+    const d = result.dog
+    const text = `Name: ${d.name}\nPhone: ${d.owner_phone || 'N/A'}\nEmail: ${d.owner_email || 'N/A'}`
+    navigator.clipboard.writeText(text)
+    toast.success('Copied contact details to clipboard!')
   }
 
-  const getConfidenceTextColor = (similarity: number): string => {
-    if (similarity >= 0.85) return 'text-emerald-400'
-    if (similarity >= 0.75) return 'text-yellow-400'
-    return 'text-zinc-400'
+  const submitReport = async () => {
+    if (!result?.dog?.dog_id) return
+    try {
+      await fetch('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dog_id: result.dog.dog_id, note: reportNote })
+      })
+      toast.success('Report submitted. Thank you for your feedback.')
+      setShowReportModal(false)
+      setReportNote('')
+    } catch (err) {
+      toast.error('Failed to submit report. Please try again.')
+    }
+  }
+
+  const getConfidenceColor = (similarity: number) => {
+    if (similarity >= 0.80) return 'bg-[var(--color-success)]'
+    if (similarity >= 0.62) return 'bg-[var(--color-accent)]'
+    return 'bg-[var(--color-warn)]'
   }
 
   return (
-    <>
-      <AppHeader />
-      <div className="min-h-screen p-6 pt-24 flex flex-col items-center w-full z-10 relative">
-        <div className="w-full max-w-md mb-8 flex items-center justify-center">
-          <h1 className="text-2xl font-bold tracking-wide text-zinc-100">Identify</h1>
-        </div>
+    <div className="min-h-[calc(100vh-64px)] p-4 pt-8 flex flex-col items-center w-full relative z-10">
+      
+      {/* Ambient background only for identify page */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[60vw] h-[60vw] rounded-full border border-[var(--color-accent)] opacity-10 animate-pulse-slow pointer-events-none blur-3xl z-0"></div>
 
       <AnimatePresence mode="wait">
         {/* Idle — Camera */}
@@ -114,39 +142,56 @@ export default function IdentifyPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="w-full max-w-md"
+            className="w-full max-w-md relative z-10"
           >
-            <div className="flex justify-between items-center mb-6">
-              <Link href="/" className="flex items-center text-zinc-400 hover:text-white transition">
-                <ChevronLeft size={20} className="mr-1" />
-                <span className="text-sm font-medium">Back to Home</span>
-              </Link>
+            <div className="flex flex-col items-center mb-8">
+              <Camera className="w-12 h-12 text-[var(--color-accent)] mb-4" />
+              <h2 className="text-2xl font-bold font-display text-[var(--color-text)]">Point at any dog's nose</h2>
             </div>
-            <p className="text-center text-zinc-400 mb-8 font-light">Point at the dog&apos;s nose and capture a clear photo.</p>
+            
             <CameraCapture onCapture={handleCapture} />
+
+            <div className="mt-6">
+              <button 
+                onClick={() => setShowTips(!showTips)}
+                className="w-full text-center text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors py-2"
+              >
+                Tips for a good scan {showTips ? '▲' : '▼'}
+              </button>
+              <AnimatePresence>
+                {showTips && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <ul className="text-sm text-[var(--color-muted)] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4 space-y-2 mt-2">
+                      <li className="flex items-center gap-2"><span>•</span> Get within 30cm of the nose</li>
+                      <li className="flex items-center gap-2"><span>•</span> Face the nose toward light</li>
+                      <li className="flex items-center gap-2"><span>•</span> Keep the dog still for 1 second</li>
+                    </ul>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </motion.div>
         )}
 
-        {/* Processing — Animated 3-step sequence */}
+        {/* Processing State */}
         {status === 'processing' && (
           <motion.div 
             key="processing"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-24 w-full max-w-md"
+            className="flex flex-col items-center justify-center py-24 w-full max-w-md relative z-10"
           >
-            {/* Cinematic spinner */}
-            <div className="relative w-32 h-32 mb-10">
-              <div className="absolute inset-0 border-t-2 border-blue-500 rounded-full animate-spin"></div>
-              <div className="absolute inset-2 border-r-2 border-emerald-500 rounded-full animate-[spin_2s_reverse_infinite]"></div>
-              <div className="absolute inset-0 flex items-center justify-center text-blue-400">
-                <Fingerprint size={48} strokeWidth={1} />
-              </div>
+            <div className="w-32 h-32 mb-12 relative flex items-center justify-center">
+              {PROCESSING_STEPS[processingStep]?.icon}
             </div>
 
-            {/* Animated step labels */}
             {!isWaking ? (
-              <div className="space-y-4 w-full max-w-xs">
+              <div className="space-y-6 w-full px-8">
                 {PROCESSING_STEPS.map((pStep, i) => (
                   <motion.div
                     key={i}
@@ -155,152 +200,139 @@ export default function IdentifyPage() {
                       opacity: i <= processingStep ? 1 : 0.3,
                       x: 0,
                     }}
-                    transition={{ delay: i * 0.2, duration: 0.3 }}
-                    className={`flex items-center gap-3 text-sm transition-colors duration-300 ${
-                      i === processingStep ? 'text-zinc-100' : i < processingStep ? 'text-zinc-500' : 'text-zinc-700'
+                    className={`text-center transition-colors duration-300 ${
+                      i === processingStep ? 'text-[var(--color-text)] font-semibold text-lg' : 'text-[var(--color-muted)] text-sm'
                     }`}
                   >
-                    <span className="text-lg">{pStep.icon}</span>
-                    <span className="font-medium">{pStep.label}</span>
-                    {i < processingStep && (
-                      <motion.span 
-                        initial={{ scale: 0 }} 
-                        animate={{ scale: 1 }} 
-                        className="ml-auto text-emerald-400 text-xs"
-                      >
-                        ✓
-                      </motion.span>
-                    )}
-                    {i === processingStep && (
-                      <Loader2 className="ml-auto animate-spin text-blue-400" size={14} />
-                    )}
+                    {pStep.label}
                   </motion.div>
                 ))}
               </div>
             ) : (
-              <div className="text-center">
-                <h2 className="text-lg font-light text-zinc-200 mb-2">Waking up the matching engine…</h2>
-                <p className="text-zinc-500 text-sm">(first request takes ~20s on free tier)</p>
+              <div className="text-center animate-pulse">
+                <h2 className="text-lg font-medium text-[var(--color-text)] mb-2">Waking up secure environment...</h2>
+                <p className="text-[var(--color-muted)] text-sm">Takes a few extra seconds</p>
               </div>
             )}
           </motion.div>
         )}
 
-        {/* No Match */}
+        {/* No Match State */}
         {status === 'no_match' && (
           <motion.div 
             key="no_match"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center py-20 w-full max-w-md bg-zinc-900/50 backdrop-blur-md p-8 rounded-[2rem] border border-zinc-800 text-center shadow-2xl"
+            className="flex flex-col items-center w-full max-w-md relative z-10"
           >
-            <div className="text-6xl mb-6">🐾</div>
-            <h2 className="text-2xl font-semibold text-zinc-100 mb-3">Dog Not Enrolled</h2>
-            <p className="text-zinc-400 mb-10 font-light">This nose print doesn&apos;t match any dogs in the database.</p>
-            <div className="w-full space-y-3">
+            <div className="w-24 h-24 rounded-full bg-[var(--color-surface)] border-2 border-[var(--color-warn)] flex items-center justify-center mb-6">
+              <AlertTriangle className="w-10 h-10 text-[var(--color-warn)]" />
+            </div>
+            <h2 className="text-3xl font-bold font-display text-[var(--color-text)] mb-3">No match found</h2>
+            <p className="text-[var(--color-muted)] mb-10 text-center">We couldn't find a dog with this nose print in our registry.</p>
+            
+            <div className="w-full flex flex-col sm:flex-row gap-4">
+              <Link href="/enroll" className="flex-1 py-4 bg-[var(--color-accent)] text-white text-center rounded-xl font-semibold hover:bg-blue-600 transition shadow-[0_0_15px_rgba(79,156,249,0.2)]">
+                Register this dog
+              </Link>
               <button 
                 onClick={() => setStatus('idle')}
-                className="w-full py-4 bg-zinc-100 text-zinc-950 rounded-2xl font-semibold hover:bg-white transition"
+                className="flex-1 py-4 bg-transparent border border-[var(--color-border)] text-[var(--color-text)] rounded-xl font-semibold hover:bg-[var(--color-surface)] transition"
               >
-                Try Another Photo
+                Try again
               </button>
-              <Link href="/enroll" className="block w-full py-4 bg-zinc-800 text-white rounded-2xl font-medium hover:bg-zinc-700 transition text-center">
-                Enroll This Dog
-              </Link>
             </div>
           </motion.div>
         )}
 
-        {/* Match Results */}
-        {status === 'match' && result && (
+        {/* Match Found State */}
+        {status === 'match' && result?.dog && (
           <motion.div 
             key="match"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center py-6 w-full max-w-md"
+            className="w-full max-w-md relative z-10"
           >
-            {/* Header */}
-            <div className="relative mb-6">
-              <div className="w-28 h-28 bg-emerald-500/10 rounded-full flex items-center justify-center ring-1 ring-emerald-500/30">
-                <Fingerprint className="text-emerald-400" size={56} strokeWidth={1} />
-              </div>
-              <motion.div 
-                initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 }}
-                className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center border-4 border-zinc-950"
-              >
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-              </motion.div>
-            </div>
-            
-            <h2 className="text-3xl font-bold text-white mb-8 tracking-tight">Match Found</h2>
-
-            {/* Top Match Card */}
-            <div className="w-full space-y-4 mb-8">
-              {result.dog && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-emerald-500/30 ring-1 ring-emerald-500/10 overflow-hidden"
-                >
-                  <div className="p-5">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-zinc-200 text-xl">{result.dog.name}</span>
-                          <span className="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 font-medium">
-                            ✓ Best Match
-                          </span>
-                        </div>
-                        <div className="text-zinc-400 text-sm space-y-1 mt-3">
-                          {result.dog.breed && <p><span className="text-zinc-500">Breed:</span> {result.dog.breed}</p>}
-                          {result.dog.age !== undefined && result.dog.age !== null && <p><span className="text-zinc-500">Age:</span> {result.dog.age} yrs</p>}
-                          {result.dog.sex && <p><span className="text-zinc-500">Sex:</span> {result.dog.sex}</p>}
-                          {result.dog.color_markings && <p><span className="text-zinc-500">Color/Markings:</span> {result.dog.color_markings}</p>}
-                          
-                          {(result.dog.owner_name || result.dog.owner_phone || result.dog.owner_email) && (
-                            <div className="mt-4 pt-3 border-t border-zinc-800">
-                              <p className="text-zinc-300 font-medium mb-1">Owner Contact</p>
-                              {result.dog.owner_name && <p><span className="text-zinc-500">Name:</span> {result.dog.owner_name}</p>}
-                              {result.dog.owner_phone && <p><span className="text-zinc-500">Phone:</span> {result.dog.owner_phone}</p>}
-                              {result.dog.owner_email && <p><span className="text-zinc-500">Email:</span> {result.dog.owner_email}</p>}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <span className={`text-xl font-bold ${getConfidenceTextColor(result.dog.similarity)}`}>
-                        {(result.dog.similarity * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                    {/* Confidence bar */}
-                    <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${result.dog.similarity * 100}%` }}
-                        transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
-                        className={`h-full rounded-full ${getConfidenceColor(result.dog.similarity)}`}
-                      />
-                    </div>
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-3xl overflow-hidden shadow-2xl">
+              <div className="p-6 border-b border-[var(--color-border)] flex flex-col items-center text-center">
+                <div className="w-24 h-24 rounded-full overflow-hidden mb-4 border-2 border-[var(--color-success)] bg-[var(--color-bg)] flex items-center justify-center relative">
+                  {result.dog.profile_photo_url ? (
+                    <img src={result.dog.profile_photo_url} alt="Dog" className="w-full h-full object-cover" />
+                  ) : (
+                    <PawPrint className="w-10 h-10 text-[var(--color-muted)]" />
+                  )}
+                  <div className="absolute inset-0 ring-inset ring-2 ring-black/10 rounded-full"></div>
+                </div>
+                <h2 className="text-3xl font-display font-bold text-[var(--color-text)] mb-1">{result.dog.name}</h2>
+                {result.dog.breed && <p className="text-[var(--color-muted)]">{result.dog.breed}</p>}
+                
+                {/* Confidence Meter */}
+                <div className="w-full mt-6 flex flex-col items-center">
+                  <div className="flex justify-between w-full text-xs font-mono text-[var(--color-muted)] mb-2 px-2">
+                    <span>Similarity</span>
+                    <span className="text-[var(--color-text)]">{(result.dog.similarity * 100).toFixed(1)}%</span>
                   </div>
-                </motion.div>
-              )}
+                  <div className="w-full h-2.5 bg-[var(--color-bg)] rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${result.dog.similarity * 100}%` }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                      className={`h-full rounded-full ${getConfidenceColor(result.dog.similarity)}`}
+                    />
+                  </div>
+                </div>
+                
+                {result.dog.microchip_id && (
+                  <div className="mt-4 inline-flex items-center bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-1 rounded-md text-xs font-mono text-[var(--color-muted)]">
+                    Microchip: {result.dog.microchip_id}
+                  </div>
+                )}
+              </div>
+
+              {/* Contact Block */}
+              <div className="p-6 bg-[var(--color-bg)]/50">
+                <p className="text-sm font-semibold text-[var(--color-text)] mb-4">Owner Contact</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <a href={`tel:${result.dog.owner_phone || ''}`} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-colors group">
+                    <Phone className="w-5 h-5 mb-2 text-[var(--color-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
+                    <span className="text-xs font-medium">Call</span>
+                  </a>
+                  <a href={`mailto:${result.dog.owner_email || ''}`} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-colors group">
+                    <Mail className="w-5 h-5 mb-2 text-[var(--color-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
+                    <span className="text-xs font-medium">Email</span>
+                  </a>
+                  <button onClick={handleCopy} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-colors group">
+                    <Copy className="w-5 h-5 mb-2 text-[var(--color-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
+                    <span className="text-xs font-medium">Copy Details</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Action buttons */}
-            <button 
-              onClick={() => { setStatus('idle'); setResult(null) }}
-              className="w-full py-4 bg-zinc-800 text-white rounded-2xl font-medium hover:bg-zinc-700 transition border border-white/5"
-            >
-              Try Another Photo
-            </button>
+            <div className="mt-6 flex flex-col gap-4">
+              <button 
+                onClick={() => { setStatus('idle'); setResult(null) }}
+                className="w-full py-4 bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] rounded-xl font-semibold hover:bg-[var(--color-border)] transition"
+              >
+                Scan Another Dog
+              </button>
+              
+              <button 
+                onClick={() => setShowReportModal(true)}
+                className="text-xs text-[var(--color-muted)] underline text-center hover:text-[var(--color-text)]"
+              >
+                Report this match as incorrect
+              </button>
+            </div>
           </motion.div>
         )}
-        
+
         {/* Error */}
         {status === 'error' && error && (
           <motion.div 
             key="error"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="w-full flex justify-center pb-20"
+            className="w-full flex justify-center pb-20 relative z-10"
           >
             <NetworkError 
               error={error} 
@@ -309,7 +341,68 @@ export default function IdentifyPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Report Modal */}
+      <AnimatePresence>
+        {showReportModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-sm bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6"
+            >
+              <h3 className="text-lg font-bold text-[var(--color-text)] mb-2">Report Match</h3>
+              <p className="text-sm text-[var(--color-muted)] mb-4">Please provide details on why you believe this match is incorrect.</p>
+              <textarea 
+                value={reportNote}
+                onChange={e => setReportNote(e.target.value)}
+                className="w-full h-24 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-3 text-sm text-[var(--color-text)] mb-4 focus:outline-none focus:border-[var(--color-accent)]"
+                placeholder="E.g., The dog in the photo looks different from the scan..."
+              />
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowReportModal(false)}
+                  className="flex-1 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text)] font-medium hover:bg-[var(--color-bg)]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={submitReport}
+                  className="flex-1 py-2 rounded-lg bg-[var(--color-error)] text-white font-medium hover:bg-red-600"
+                >
+                  Submit
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
-    </>
+  )
+}
+
+// Mini components for processing animations
+function ScanBox() {
+  return (
+    <div className="w-20 h-20 border-2 border-dashed border-[var(--color-accent)] rounded-2xl relative overflow-hidden flex items-center justify-center shadow-[0_0_20px_rgba(79,156,249,0.3)]">
+      <PawPrint className="w-8 h-8 text-[var(--color-accent)] opacity-50" />
+      <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--color-accent)] animate-scan shadow-[0_0_10px_rgba(79,156,249,1)]"></div>
+    </div>
+  )
+}
+
+function Waveform() {
+  return (
+    <div className="flex gap-1 h-12 items-center justify-center">
+      {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+        <motion.div 
+          key={i}
+          animate={{ height: ['20%', '100%', '20%'] }}
+          transition={{ duration: 1, repeat: Infinity, delay: i * 0.1, ease: 'easeInOut' }}
+          className="w-1.5 bg-[var(--color-accent-2)] rounded-full shadow-[0_0_10px_rgba(167,139,250,0.5)]"
+        />
+      ))}
+    </div>
   )
 }

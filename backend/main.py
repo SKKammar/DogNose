@@ -61,9 +61,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # Import and include routers
-from routers import dogs  # noqa: E402
+from routers import dogs, stats, validate, report  # noqa: E402
 
-app.include_router(dogs.router)
+app.include_router(dogs.router, prefix="/api")
+app.include_router(stats.router, prefix="/api")
+app.include_router(validate.router, prefix="/api")
+app.include_router(report.router, prefix="/api")
 
 
 @app.middleware("http")
@@ -74,7 +77,7 @@ async def check_models_for_inference(request: Request, call_next):
     """
     from services.inference import models_ready
 
-    inference_routes = ["/dogs/identify", "/enroll"]
+    inference_routes = ["/dogs/identify", "/enroll", "/validate-nose"]
     path = request.url.path
     if any(route in path for route in inference_routes) and request.method == "POST":
         if not models_ready():

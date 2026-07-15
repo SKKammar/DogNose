@@ -134,3 +134,35 @@ export async function listDogs(token: string) {
   })
   return res.json()
 }
+
+/**
+ * Get details for a specific dog.
+ */
+export async function getDog(dogId: string, token: string) {
+  const res = await fetchWithErrorHandling(`${API_URL}/dogs/${dogId}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  return res.json()
+}
+
+/**
+ * List scan logs for the authenticated user's dogs.
+ */
+export async function getScanLogs(token: string, limit: number = 50) {
+  const res = await fetchWithErrorHandling(`${API_URL}/scan-logs?limit=${limit}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  return res.json()
+}
+
+/**
+ * Delete a dog.
+ */
+export async function deleteDog(dogId: string, token: string) {
+  const res = await fetchWithErrorHandling(`${API_URL}/dogs/${dogId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  return res.json()
+}
+

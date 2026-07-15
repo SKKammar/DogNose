@@ -44,6 +44,7 @@ class DogCreate(BaseModel):
     owner_email: Optional[str] = None
     microchip_id: Optional[str] = None
     notes: Optional[str] = None
+    profile_photo_url: Optional[str] = None
 
 
 class DogResponse(BaseModel):
@@ -58,6 +59,7 @@ class DogResponse(BaseModel):
     owner_email: Optional[str] = None
     microchip_id: Optional[str] = None
     notes: Optional[str] = None
+    profile_photo_url: Optional[str] = None
 
 
 class DogListItem(BaseModel):
@@ -65,6 +67,7 @@ class DogListItem(BaseModel):
     name: str
     breed: Optional[str] = None
     nose_print_count: int = 0
+    profile_photo_url: Optional[str] = None
 
 
 class MatchCandidate(BaseModel):
@@ -77,6 +80,7 @@ class MatchCandidate(BaseModel):
     owner_name: Optional[str] = None
     owner_phone: Optional[str] = None
     owner_email: Optional[str] = None
+    profile_photo_url: Optional[str] = None
     similarity: float
     is_match: bool
 
@@ -150,6 +154,7 @@ def register_dog(
         "owner_email": dog.owner_email,
         "microchip_id": dog.microchip_id,
         "notes": dog.notes,
+        "profile_photo_url": dog.profile_photo_url,
     }
 
     res = supabase.table("dogs").insert(data).execute()
@@ -169,6 +174,7 @@ def register_dog(
         owner_email=row.get("owner_email"),
         microchip_id=row.get("microchip_id"),
         notes=row.get("notes"),
+        profile_photo_url=row.get("profile_photo_url"),
     )
 
 
@@ -183,7 +189,7 @@ def list_dogs(
 
     dogs_res = (
         supabase.table("dogs")
-        .select("id, name, breed, embedding")
+        .select("id, name, breed, embedding, profile_photo_url")
         .eq("owner", user_id)
         .execute()
     )
@@ -197,6 +203,7 @@ def list_dogs(
             name=d["name"],
             breed=d.get("breed"),
             nose_print_count=1 if d.get("embedding") else 0,
+            profile_photo_url=d.get("profile_photo_url"),
         )
         for d in dogs_res.data
     ]
@@ -273,6 +280,65 @@ async def enroll_dog(
     return {"nose_print_id": dog_id, "photos_processed": len(valid_embeddings)}
 
 
+@router.get("/{dog_id}", response_model=DogResponse)
+def get_dog(dog_id: str, user_id: str = Depends(get_current_user_id)):
+    """Get full dog profile."""
+    supabase = get_service_supabase()
+    res = supabase.table("dogs").select("*").eq("id", dog_id).eq("owner", user_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Dog not found")
+    row = res.data[0]
+    return DogResponse(**row)
+
+
+@router.delete("/{dog_id}")
+def delete_dog(dog_id: str, user_id: str = Depends(get_current_user_id)):
+    """Delete a dog."""
+    supabase = get_service_supabase()
+    # verify ownership
+    check = supabase.table("dogs").select("id").eq("id", dog_id).eq("owner", user_id).execute()
+    if not check.data:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    # Due to ON DELETE CASCADE on potential FKs, this might be simpler.
+    # Note: supabase storage deletion is omitted for simplicity in this endpoint, 
+    # could be added via supabase storage API if required.
+    res = supabase.table("dogs").delete().eq("id", dog_id).execute()
+    return {"deleted": True}
+
+
+@router.get("/user/scan-logs")
+def get_scan_logs(user_id: str = Depends(get_current_user_id)):
+    """Return scan events for the authenticated user's dogs."""
+    supabase = get_service_supabase()
+    res = supabase.rpc("get_user_scan_logs", {"p_owner_id": user_id}).execute()
+    
+    # Alternative direct approach using inner join if RPC not defined:
+    # res = supabase.table("scan_logs").select("*, dogs!inner(name, owner)").eq("dogs.owner", user_id).order("scanned_at", desc=True).limit(50).execute()
+    
+    if res.data is None:
+        # fallback if rpc is not created
+        dogs_res = supabase.table("dogs").select("id, name").eq("owner", user_id).execute()
+        if not dogs_res.data:
+            return []
+        dog_ids = [d["id"] for d in dogs_res.data]
+        dog_names = {d["id"]: d["name"] for d in dogs_res.data}
+        if not dog_ids:
+            return []
+        logs_res = supabase.table("scan_logs").select("*").in_("matched_dog_id", dog_ids).order("scanned_at", desc=True).limit(50).execute()
+        if not logs_res.data:
+            return []
+        
+        result = []
+        for l in logs_res.data:
+            result.append({
+                "dog_name": dog_names.get(l["matched_dog_id"], "Unknown"),
+                "similarity_score": l["similarity_score"],
+                "scanned_at": l["scanned_at"]
+            })
+        return result
+    return res.data
+
+
 @router.post("/identify")
 @limiter.limit(IDENTIFY_RATE_LIMIT)
 async def identify_dog(
@@ -327,6 +393,7 @@ async def identify_dog(
             owner_name=row.get("owner_name"),
             owner_phone=row.get("owner_phone"),
             owner_email=row.get("owner_email"),
+            profile_photo_url=row.get("profile_photo_url"),
             similarity=round(float(row["similarity"]), 4),
             is_match=float(row["similarity"]) >= MATCH_THRESHOLD,
         )
@@ -336,5 +403,18 @@ async def identify_dog(
     # Check if top result meets threshold
     if matches[0].similarity < MATCH_THRESHOLD:
         return {"match": False, "message": "No matching dog found", "confidence": matches[0].similarity}
+
+    # Log successful match
+    try:
+        client_ip = request.client.host if request.client else "unknown"
+        import hashlib
+        ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()
+        supabase.table("scan_logs").insert({
+            "matched_dog_id": matches[0].dog_id,
+            "similarity_score": matches[0].similarity,
+            "scanner_ip_hash": ip_hash
+        }).execute()
+    except Exception as e:
+        logger.error(f"Failed to log scan: {e}")
 
     return {"match": True, "message": "Match found", "confidence": matches[0].similarity, "dog": matches[0].dict()}
