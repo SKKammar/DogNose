@@ -79,33 +79,44 @@ export default function HomePage() {
       <section className="w-full bg-[var(--color-surface)] border-y border-[var(--color-border)] py-20 px-4 z-10">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold font-display text-center mb-16">How It Works</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-50px" }}
+            variants={{
+              hidden: {},
+              visible: { transition: { staggerChildren: 0.2 } }
+            }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-12 relative"
+          >
             
             {/* Desktop connecting line */}
             <div className="hidden md:block absolute top-8 left-[16%] right-[16%] h-0.5 bg-[var(--color-border)] z-0"></div>
 
-            <div className="flex flex-col items-center text-center relative z-10">
-              <div className="w-16 h-16 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-accent)] flex items-center justify-center mb-6 shadow-lg">
+            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="flex flex-col items-center text-center relative z-10 group cursor-default">
+              <div className="w-16 h-16 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-accent)] flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(79,156,249,0.3)] transition-all duration-300">
                 <Camera className="w-7 h-7 text-[var(--color-accent)]" />
               </div>
               <h3 className="text-xl font-semibold mb-2">1. Snap</h3>
               <p className="text-[var(--color-muted)]">Take a photo of any dog's nose</p>
-            </div>
-            <div className="flex flex-col items-center text-center relative z-10">
-              <div className="w-16 h-16 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-accent)] flex items-center justify-center mb-6 shadow-lg">
+            </motion.div>
+            
+            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="flex flex-col items-center text-center relative z-10 group cursor-default">
+              <div className="w-16 h-16 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-accent)] flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(79,156,249,0.3)] transition-all duration-300">
                 <ScanFace className="w-7 h-7 text-[var(--color-accent)]" />
               </div>
               <h3 className="text-xl font-semibold mb-2">2. Match</h3>
               <p className="text-[var(--color-muted)]">Our AI searches the entire registry instantly</p>
-            </div>
-            <div className="flex flex-col items-center text-center relative z-10">
-              <div className="w-16 h-16 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-accent)] flex items-center justify-center mb-6 shadow-lg">
+            </motion.div>
+            
+            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="flex flex-col items-center text-center relative z-10 group cursor-default">
+              <div className="w-16 h-16 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-accent)] flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(79,156,249,0.3)] transition-all duration-300">
                 <CheckCircle className="w-7 h-7 text-[var(--color-accent)]" />
               </div>
               <h3 className="text-xl font-semibold mb-2">3. Reunite</h3>
               <p className="text-[var(--color-muted)]">Contact the owner directly — no middleman</p>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 
@@ -113,18 +124,27 @@ export default function HomePage() {
       <section className="py-20 px-4 w-full max-w-5xl mx-auto z-10 text-center">
         <h2 className="text-3xl font-bold font-display mb-12">Built for real emergencies</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-          <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 flex flex-col items-center">
+        <motion.div 
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-50px" }}
+          variants={{
+            hidden: {},
+            visible: { transition: { staggerChildren: 0.2 } }
+          }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12"
+        >
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 flex flex-col items-center hover:border-[var(--color-accent)] hover:shadow-[0_0_30px_rgba(79,156,249,0.1)] transition-all duration-300 hover:-translate-y-1">
             <Smartphone className="w-10 h-10 text-[var(--color-accent)] mb-4" />
             <h3 className="text-xl font-semibold mb-2">Works anywhere</h3>
             <p className="text-[var(--color-muted)]">Identify requires no account, works on any smartphone browser, and returns results in under 3 seconds.</p>
-          </div>
-          <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 flex flex-col items-center">
+          </motion.div>
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 flex flex-col items-center hover:border-[var(--color-accent)] hover:shadow-[0_0_30px_rgba(79,156,249,0.1)] transition-all duration-300 hover:-translate-y-1">
             <ShieldCheck className="w-10 h-10 text-[var(--color-accent)] mb-4" />
             <h3 className="text-xl font-semibold mb-2">Privacy first</h3>
             <p className="text-[var(--color-muted)]">Owner contact info is only revealed when a positive biometric match is made. Your data is secure.</p>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         <div className="inline-block bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full px-6 py-3 shadow-[0_0_15px_rgba(167,139,250,0.15)]">
           <p className="text-[var(--color-accent-2)] font-mono font-medium flex items-center gap-2 text-sm">

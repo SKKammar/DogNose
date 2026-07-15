@@ -294,20 +294,25 @@ export default function IdentifyPage() {
               {/* Contact Block */}
               <div className="p-6 bg-[var(--color-bg)]/50">
                 <p className="text-sm font-semibold text-[var(--color-text)] mb-4">Owner Contact</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <a href={`tel:${result.dog.owner_phone || ''}`} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-colors group">
+                <motion.div 
+                  initial="hidden"
+                  animate="visible"
+                  variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+                >
+                  <motion.a variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }} href={`tel:${result.dog.owner_phone || ''}`} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:shadow-[0_0_15px_rgba(79,156,249,0.1)] text-[var(--color-text)] transition-all duration-300 hover:-translate-y-1 group">
                     <Phone className="w-5 h-5 mb-2 text-[var(--color-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
                     <span className="text-xs font-medium">Call</span>
-                  </a>
-                  <a href={`mailto:${result.dog.owner_email || ''}`} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-colors group">
+                  </motion.a>
+                  <motion.a variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }} href={`mailto:${result.dog.owner_email || ''}`} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:shadow-[0_0_15px_rgba(79,156,249,0.1)] text-[var(--color-text)] transition-all duration-300 hover:-translate-y-1 group">
                     <Mail className="w-5 h-5 mb-2 text-[var(--color-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
                     <span className="text-xs font-medium">Email</span>
-                  </a>
-                  <button onClick={handleCopy} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-colors group">
+                  </motion.a>
+                  <motion.button variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }} onClick={handleCopy} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:shadow-[0_0_15px_rgba(79,156,249,0.1)] text-[var(--color-text)] transition-all duration-300 hover:-translate-y-1 group">
                     <Copy className="w-5 h-5 mb-2 text-[var(--color-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
                     <span className="text-xs font-medium">Copy Details</span>
-                  </button>
-                </div>
+                  </motion.button>
+                </motion.div>
               </div>
             </div>
 

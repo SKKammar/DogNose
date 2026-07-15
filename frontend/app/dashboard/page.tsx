@@ -162,15 +162,19 @@ export default function DashboardPage() {
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <motion.div 
+                initial="hidden" 
+                animate="visible" 
+                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }} 
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
                 <AnimatePresence>
                   {dogs.map(dog => (
                     <motion.div 
                       key={dog.id}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
                       exit={{ opacity: 0, scale: 0.9 }}
-                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 hover:border-[var(--color-accent)] transition-colors group relative overflow-hidden"
+                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 hover:border-[var(--color-accent)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(79,156,249,0.1)] group relative overflow-hidden"
                     >
                       <div className="flex gap-4">
                         <div className="w-16 h-16 rounded-full overflow-hidden bg-[var(--color-bg)] shrink-0 border border-[var(--color-border)] flex items-center justify-center">
@@ -205,7 +209,7 @@ export default function DashboardPage() {
                     </motion.div>
                   ))}
                 </AnimatePresence>
-              </div>
+              </motion.div>
             )}
           </div>
 
@@ -222,9 +226,18 @@ export default function DashboardPage() {
                   <p className="text-[var(--color-muted)] text-sm">No scans logged yet.</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <motion.div 
+                  initial="hidden" 
+                  animate="visible" 
+                  variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }} 
+                  className="space-y-4"
+                >
                   {logs.map(log => (
-                    <div key={log.id} className="flex gap-4 p-3 rounded-xl hover:bg-[var(--color-bg)] transition-colors border border-transparent hover:border-[var(--color-border)]">
+                    <motion.div 
+                      key={log.id} 
+                      variants={{ hidden: { opacity: 0, x: -10 }, visible: { opacity: 1, x: 0 } }}
+                      className="flex gap-4 p-3 rounded-xl hover:bg-[var(--color-bg)] transition-all duration-300 border border-transparent hover:border-[var(--color-border)] hover:shadow-md"
+                    >
                       <div className="w-10 h-10 rounded-full bg-[var(--color-bg)] border border-[var(--color-border)] flex items-center justify-center shrink-0">
                         <Search className="w-4 h-4 text-[var(--color-accent-2)]" />
                       </div>
@@ -246,9 +259,9 @@ export default function DashboardPage() {
                           </p>
                         )}
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
-                </div>
+                </motion.div>
               )}
             </div>
           </div>
