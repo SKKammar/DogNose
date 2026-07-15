@@ -117,7 +117,7 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center p-10 border rounded-3xl w-full max-w-md mx-auto aspect-[3/4] backdrop-blur-sm relative overflow-hidden transition ${isDragging ? 'border-[var(--color-accent)] bg-[var(--color-bg)]' : 'border-[var(--color-border)] bg-[var(--color-surface)]'}`}
+        className={`flex flex-col items-center justify-center p-10 border rounded-3xl w-full h-full max-w-md mx-auto backdrop-blur-sm relative overflow-hidden transition ${isDragging ? 'border-[var(--color-accent)] bg-[var(--color-bg)]' : 'border-[var(--color-border)] bg-[var(--color-surface)]'}`}
       >
         <Upload className={`${isDragging ? 'text-blue-400' : 'text-zinc-500'} mb-4 transition`} size={48} strokeWidth={1} />
         <p className="text-zinc-400 mb-6 text-center font-light">
@@ -135,7 +135,7 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
   }
 
   return (
-    <div className="relative w-full max-w-md mx-auto bg-black rounded-3xl overflow-hidden aspect-[3/4] shadow-2xl ring-1 ring-white/10">
+    <div className="relative w-full h-full max-w-md mx-auto bg-black rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10">
       {error ? (
         <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-center p-6 bg-zinc-900">
           {error}

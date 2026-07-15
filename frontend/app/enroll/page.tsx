@@ -331,7 +331,9 @@ export default function EnrollPage() {
               }
             </p>
             
-            <CameraCapture onCapture={handleCapture} remainingPhotos={retakeIndex !== null ? 1 : Infinity} />
+            <div className="w-full aspect-[3/4]">
+              <CameraCapture onCapture={handleCapture} remainingPhotos={retakeIndex !== null ? 1 : Infinity} />
+            </div>
             
             {photos.length > 0 && (
               <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500 bg-[var(--color-surface)] border border-[var(--color-border)] p-4 rounded-3xl">

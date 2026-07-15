@@ -129,7 +129,7 @@ export default function IdentifyPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] p-4 pt-8 flex flex-col items-center w-full relative z-10">
+    <div className="h-[calc(100vh-64px)] overflow-hidden p-4 pt-8 flex flex-col items-center w-full relative z-10">
       
       {/* Ambient background only for identify page */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[60vw] h-[60vw] rounded-full border border-[var(--color-accent)] opacity-10 animate-pulse-slow pointer-events-none blur-3xl z-0"></div>
@@ -142,16 +142,18 @@ export default function IdentifyPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="w-full max-w-md relative z-10"
+            className="w-full h-full max-w-md relative z-10 flex flex-col pb-4"
           >
-            <div className="flex flex-col items-center mb-8">
-              <Camera className="w-12 h-12 text-[var(--color-accent)] mb-4" />
-              <h2 className="text-2xl font-bold font-display text-[var(--color-text)]">Point at any dog's nose</h2>
+            <div className="flex flex-col items-center mb-6 shrink-0">
+              <Camera className="w-10 h-10 text-[var(--color-accent)] mb-2" />
+              <h2 className="text-xl font-bold font-display text-[var(--color-text)]">Point at any dog's nose</h2>
             </div>
             
-            <CameraCapture onCapture={handleCapture} />
+            <div className="flex-1 min-h-0 w-full relative">
+              <CameraCapture onCapture={handleCapture} />
+            </div>
 
-            <div className="mt-6">
+            <div className="mt-4 shrink-0">
               <button 
                 onClick={() => setShowTips(!showTips)}
                 className="w-full text-center text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors py-2"
