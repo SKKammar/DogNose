@@ -9,8 +9,8 @@ const syne = Syne({ subsets: ['latin'], variable: '--font-display' })
 const jetbrains = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  title: 'DogNose',
-  description: 'DogNose — biometric dog identification by nose print.',
+  title: 'CANID',
+  description: 'CANID — biometric dog identification by nose print.',
   manifest: '/manifest.json',
   themeColor: '#0A0E14',
 }

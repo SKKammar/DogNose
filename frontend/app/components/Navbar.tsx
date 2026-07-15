@@ -54,7 +54,10 @@ export default function Navbar() {
             <Link href="/" className="flex items-center gap-2 group">
               <PawPrint className="w-6 h-6 text-[var(--color-accent)] group-hover:scale-110 transition-transform" />
               <span className="font-display font-bold text-xl tracking-tight text-[var(--color-accent)]">
-                DogNose
+                CANID
+              </span>
+              <span className="ml-2 hidden sm:inline-block px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 rounded text-[10px] font-mono uppercase tracking-wider mt-1">
+                For learning purpose only
               </span>
             </Link>
           </div>

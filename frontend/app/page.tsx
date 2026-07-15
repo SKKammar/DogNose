@@ -33,9 +33,14 @@ export default function HomePage() {
           Every Nose.<br/>
           <span className="text-[var(--color-accent)]">One Identity.</span>
         </h1>
-        <p className="text-lg md:text-xl text-[var(--color-muted)] mb-12 max-w-2xl font-light">
-          The world's first open biometric registry for dogs. Find lost pets in seconds.
+        <p className="text-lg md:text-xl text-[var(--color-muted)] mb-4 max-w-2xl font-light">
+          A biometric registry for dogs. Just like a human fingerprint, every dog's nose pattern is completely unique. Find lost pets in seconds.
         </p>
+        <div className="mb-12">
+          <span className="inline-block px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 rounded-full text-xs font-semibold uppercase tracking-wider">
+            For learning purpose only
+          </span>
+        </div>
         
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center mb-16">
           <Link href="/identify" className="bg-[var(--color-accent)] hover:bg-blue-600 text-white font-semibold py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(79,156,249,0.25)] hover:shadow-[0_0_30px_rgba(79,156,249,0.4)] transition-all flex items-center justify-center gap-2 text-lg">
@@ -122,9 +127,9 @@ export default function HomePage() {
         </div>
 
         <div className="inline-block bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full px-6 py-3 shadow-[0_0_15px_rgba(167,139,250,0.15)]">
-          <p className="text-[var(--color-accent-2)] font-mono font-medium flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[var(--color-success)] animate-pulse"></span>
-            98.4% identification accuracy on matched dogs
+          <p className="text-[var(--color-accent-2)] font-mono font-medium flex items-center gap-2 text-sm">
+            <span className="w-2 h-2 rounded-full bg-[var(--color-accent-2)] animate-pulse"></span>
+            Identification accuracy: We are actively working on improving it
           </p>
         </div>
       </section>
@@ -140,7 +145,7 @@ export default function HomePage() {
             <Link href="/privacy" className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]">Privacy</Link>
           </div>
           <p className="text-xs text-[var(--color-muted)] text-center max-w-2xl">
-            DogNose uses ArcFace biometric technology — the same family of algorithms used in human facial recognition systems.
+            CANID uses ArcFace biometric technology — the same family of algorithms used in human facial recognition systems.
           </p>
         </div>
       </footer>

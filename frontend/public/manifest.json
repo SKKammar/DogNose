@@ -1,6 +1,7 @@
 {
-  "name": "DogNose",
-  "short_name": "DogNose",
+  "name": "CANID",
+  "short_name": "CANID",
+  "description": "Biometric dog identification by nose print.",
   "start_url": "/identify",
   "display": "standalone",
   "background_color": "#0A0E14",
