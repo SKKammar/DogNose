@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { listDogs, getScanLogs, deleteDog } from '../../lib/api'
-import { Loader2, Trash2, ShieldCheck, PawPrint, Clock, MapPin, Search } from 'lucide-react'
+import { Loader2, Trash2, ShieldCheck, PawPrint, Clock, MapPin, Search, Edit } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -198,14 +198,23 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       
-                      <button 
-                        onClick={() => handleDelete(dog.id, dog.name)}
-                        disabled={isDeleting === dog.id}
-                        className="absolute top-4 right-4 p-2 text-[var(--color-muted)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
-                        title="Delete profile"
-                      >
-                        {isDeleting === dog.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                      </button>
+                      <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        <Link
+                          href={`/edit/${dog.id}`}
+                          className="p-2 text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 rounded-lg transition-colors"
+                          title="Edit profile"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Link>
+                        <button 
+                          onClick={() => handleDelete(dog.id, dog.name)}
+                          disabled={isDeleting === dog.id}
+                          className="p-2 text-[var(--color-muted)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 rounded-lg transition-colors disabled:opacity-50"
+                          title="Delete profile"
+                        >
+                          {isDeleting === dog.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </motion.div>
                   ))}
                 </AnimatePresence>

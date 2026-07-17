@@ -52,6 +52,20 @@ class DogCreate(BaseModel):
     profile_photo_url: Optional[str] = None
 
 
+class DogUpdate(BaseModel):
+    name: Optional[str] = None
+    breed: Optional[str] = None
+    age: Optional[float] = None
+    sex: Optional[str] = None
+    color_markings: Optional[str] = None
+    owner_name: Optional[str] = None
+    owner_phone: Optional[str] = None
+    owner_email: Optional[str] = None
+    microchip_id: Optional[str] = None
+    notes: Optional[str] = None
+    profile_photo_url: Optional[str] = None
+
+
 class DogResponse(BaseModel):
     id: str
     name: str
@@ -315,6 +329,33 @@ def delete_dog(dog_id: str, user_id: str = Depends(get_current_user_id)):
     # could be added via supabase storage API if required.
     res = supabase.table("dogs").delete().eq("id", dog_id).execute()
     return {"deleted": True}
+
+
+@router.put("/{dog_id}", response_model=DogResponse)
+def update_dog(
+    dog_id: str,
+    dog: DogUpdate,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Update a dog's profile."""
+    supabase = get_service_supabase()
+    # verify ownership
+    check = supabase.table("dogs").select("id").eq("id", dog_id).eq("owner", user_id).execute()
+    if not check.data:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Filter out None values to only update provided fields
+    update_data = {k: v for k, v in dog.dict().items() if v is not None}
+    
+    if not update_data:
+        return get_dog(dog_id, user_id)
+        
+    res = supabase.table("dogs").update(update_data).eq("id", dog_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=500, detail="Failed to update dog")
+        
+    row = res.data[0]
+    return DogResponse(**row)
 
 
 @router.get("/user/scan-logs")

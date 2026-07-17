@@ -177,3 +177,18 @@ export async function deleteDog(dogId: string, token: string) {
   })
   return res.json()
 }
+
+/**
+ * Update a dog's details.
+ */
+export async function updateDog(dogId: string, details: Partial<DogDetails>, token: string) {
+  const res = await fetchWithErrorHandling(`${API_URL}/dogs/${dogId}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(details)
+  })
+  return res.json()
+}
