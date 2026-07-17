@@ -1,16 +1,20 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-export type ApiErrorType = 'network' | 'cors' | 'timeout' | 'server'
+export type ApiErrorType = 'network' | 'cors' | 'timeout' | 'server' | 'validation'
 
 export interface ApiError {
   type: ApiErrorType
   message: string
+  code?: string
   details?: any
 }
 
 /**
  * Fetch wrapper with error handling, timeout, and typed error responses.
  * Timeout set to 60s to accommodate Render free-tier cold starts.
+ *
+ * For 422 validation errors, this now returns the response (not throws)
+ * so callers can read the structured error body.
  */
 export async function fetchWithErrorHandling(url: string, options: RequestInit = {}): Promise<Response> {
   const controller = new AbortController()
@@ -30,10 +34,16 @@ export async function fetchWithErrorHandling(url: string, options: RequestInit =
         throw { type: 'server', message: "Server cold-start: waking up the matching engine, one moment..." }
       }
 
+      // For 422 (validation errors) and 400 (bad input), return the response
+      // so the caller can parse the structured error body
+      if (response.status === 422 || response.status === 400) {
+        return response
+      }
+
       let errorDetail = null
       try {
         const errorData = await response.json()
-        errorDetail = errorData.detail
+        errorDetail = errorData.detail || errorData.message
       } catch (e) {
         // Not JSON
       }
@@ -94,6 +104,7 @@ export async function registerDog(details: DogDetails, token: string) {
 
 /**
  * Upload one or multiple nose prints for a registered dog.
+ * Returns the parsed JSON response (may contain error fields).
  */
 export async function enrollNose(dogId: string, blobs: Blob[], token: string) {
   const formData = new FormData()
@@ -114,6 +125,7 @@ export async function enrollNose(dogId: string, blobs: Blob[], token: string) {
 
 /**
  * Identify a dog from a nose photo. No auth required.
+ * Returns parsed JSON — caller must check for error/matched fields.
  */
 export async function identifyNose(imageBlob: Blob) {
   const form = new FormData()
@@ -149,7 +161,7 @@ export async function getDog(dogId: string, token: string) {
  * List scan logs for the authenticated user's dogs.
  */
 export async function getScanLogs(token: string, limit: number = 50) {
-  const res = await fetchWithErrorHandling(`${API_URL}/scan-logs?limit=${limit}`, {
+  const res = await fetchWithErrorHandling(`${API_URL}/dogs/user/scan-logs?limit=${limit}`, {
     headers: { 'Authorization': `Bearer ${token}` }
   })
   return res.json()
@@ -165,4 +177,3 @@ export async function deleteDog(dogId: string, token: string) {
   })
   return res.json()
 }
-

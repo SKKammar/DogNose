@@ -1,6 +1,7 @@
 import os
 import logging
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -8,11 +9,15 @@ from dependencies import (
     get_service_supabase,
     get_current_user_id,
 )
-from services.inference import extract_embedding
+from services.inference import get_embedding, get_nose_detector
+from services.validator import (
+    run_full_validation,
+    ImageValidationError,
+    read_upload_as_array,
+)
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-import cv2
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -26,8 +31,8 @@ MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 ALLOWED_UPLOAD_TYPES = os.getenv(
     "ALLOWED_UPLOAD_TYPES", "image/jpeg,image/png,image/webp"
 ).split(",")
-MATCH_THRESHOLD = float(os.getenv("MATCH_THRESHOLD", "0.62"))
-ACTIVE_EMBEDDING_VERSION = os.getenv("ACTIVE_EMBEDDING_VERSION", "v1")
+MATCH_THRESHOLD = float(os.getenv("MATCH_THRESHOLD", "0.60"))
+ACTIVE_EMBEDDING_VERSION = "megadescriptor-v1"
 IDENTIFY_RATE_LIMIT = os.getenv("IDENTIFY_RATE_LIMIT", "10/minute")
 
 
@@ -94,8 +99,8 @@ class IdentifyResponse(BaseModel):
 
 # --- Image validation helper ---
 
-async def validate_image(request: Request, file: UploadFile) -> bytes:
-    """Validate uploaded image: check type, size, and decodability."""
+async def validate_upload_metadata(request: Request, file: UploadFile) -> None:
+    """Validate uploaded file metadata: check type and size only."""
     if file.content_type not in ALLOWED_UPLOAD_TYPES:
         raise HTTPException(
             status_code=422,
@@ -108,26 +113,6 @@ async def validate_image(request: Request, file: UploadFile) -> bytes:
             status_code=422,
             detail=f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB.",
         )
-
-    content = await file.read()
-    if len(content) > MAX_SIZE_BYTES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB.",
-        )
-
-    # Verify the image is decodable
-    nparr = np.frombuffer(content, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if img is None:
-        raise HTTPException(status_code=422, detail="Invalid image file or format")
-
-    # Re-encode as JPEG for consistent processing
-    success, buffer = cv2.imencode(".jpg", img)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to process image")
-
-    return buffer.tobytes()
 
 
 # --- Endpoints ---
@@ -218,8 +203,8 @@ async def enroll_dog(
     user_id: str = Depends(get_current_user_id),
 ):
     """
-    Enroll multiple nose photos for a dog. Runs ML pipeline on each,
-    averages the valid embeddings, and stores the centroid embedding.
+    Enroll multiple nose photos for a dog. Runs the full validation + embedding
+    pipeline on each, averages the valid embeddings, and stores the centroid.
     """
     # Verify the dog belongs to this user
     supabase = get_service_supabase()
@@ -235,27 +220,48 @@ async def enroll_dog(
             status_code=403, detail="Dog not found or you don't own this dog"
         )
 
+    nose_model = get_nose_detector()
     valid_embeddings = []
-    
-    for nose_image in nose_images:
+    errors = []
+
+    for i, nose_image in enumerate(nose_images):
         try:
-            image_bytes = await validate_image(request, nose_image)
-            embedding = extract_embedding(image_bytes, ACTIVE_EMBEDDING_VERSION)
+            # Validate file metadata
+            await validate_upload_metadata(request, nose_image)
+
+            # Read into memory as BGR array
+            image_bgr = await read_upload_as_array(nose_image)
+
+            # Run full validation pipeline (quality + dog + nose)
+            nose_crop = run_full_validation(nose_model, image_bgr)
+
+            # Extract embedding from cropped nose
+            embedding = get_embedding(nose_crop)
             valid_embeddings.append(embedding)
+        except ImageValidationError as e:
+            logger.warning(f"Photo {i+1} for {dog_id} failed validation: [{e.code}] {e.message}")
+            errors.append({"photo": i + 1, "code": e.code, "message": e.message})
+            continue
         except Exception as e:
-            # We skip invalid or undetectable noses and try the next photo
-            logger.warning(f"Skipping an uploaded photo for {dog_id}: {e}")
+            logger.warning(f"Skipping photo {i+1} for {dog_id}: {e}")
+            errors.append({"photo": i + 1, "code": "PROCESSING_ERROR", "message": str(e)})
             continue
 
     if not valid_embeddings:
-        raise HTTPException(
-            status_code=422, detail="No valid nose prints detected in any of the uploaded photos."
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": True,
+                "code": "NO_VALID_PHOTOS",
+                "message": "No valid nose prints detected in any of the uploaded photos.",
+                "photo_errors": errors,
+            }
         )
 
     # Calculate centroid embedding
     embeddings_matrix = np.vstack(valid_embeddings)
     avg_embedding = np.mean(embeddings_matrix, axis=0)
-    
+
     # L2 normalize
     norm = np.linalg.norm(avg_embedding)
     if norm > 0:
@@ -277,7 +283,12 @@ async def enroll_dog(
     if not res.data:
         raise HTTPException(status_code=500, detail="Failed to enroll dog")
 
-    return {"nose_print_id": dog_id, "photos_processed": len(valid_embeddings)}
+    return {
+        "nose_print_id": dog_id,
+        "photos_processed": len(valid_embeddings),
+        "photos_failed": len(errors),
+        "photo_errors": errors if errors else None,
+    }
 
 
 @router.get("/{dog_id}", response_model=DogResponse)
@@ -300,7 +311,7 @@ def delete_dog(dog_id: str, user_id: str = Depends(get_current_user_id)):
     if not check.data:
         raise HTTPException(status_code=403, detail="Not authorized")
     # Due to ON DELETE CASCADE on potential FKs, this might be simpler.
-    # Note: supabase storage deletion is omitted for simplicity in this endpoint, 
+    # Note: supabase storage deletion is omitted for simplicity in this endpoint,
     # could be added via supabase storage API if required.
     res = supabase.table("dogs").delete().eq("id", dog_id).execute()
     return {"deleted": True}
@@ -311,10 +322,10 @@ def get_scan_logs(user_id: str = Depends(get_current_user_id)):
     """Return scan events for the authenticated user's dogs."""
     supabase = get_service_supabase()
     res = supabase.rpc("get_user_scan_logs", {"p_owner_id": user_id}).execute()
-    
+
     # Alternative direct approach using inner join if RPC not defined:
     # res = supabase.table("scan_logs").select("*, dogs!inner(name, owner)").eq("dogs.owner", user_id).order("scanned_at", desc=True).limit(50).execute()
-    
+
     if res.data is None:
         # fallback if rpc is not created
         dogs_res = supabase.table("dogs").select("id, name").eq("owner", user_id).execute()
@@ -327,7 +338,7 @@ def get_scan_logs(user_id: str = Depends(get_current_user_id)):
         logs_res = supabase.table("scan_logs").select("*").in_("matched_dog_id", dog_ids).order("scanned_at", desc=True).limit(50).execute()
         if not logs_res.data:
             return []
-        
+
         result = []
         for l in logs_res.data:
             result.append({
@@ -347,20 +358,21 @@ async def identify_dog(
 ):
     """
     Identify a dog from a nose photo. No auth required.
-    Runs ML pipeline, then queries pgvector for top-3 matches.
+    Runs full validation pipeline, then queries pgvector for top-3 matches.
     """
-    image_bytes = await validate_image(request, nose_image)
+    # Validate file metadata (type + size)
+    await validate_upload_metadata(request, nose_image)
 
-    # Run ML pipeline
-    try:
-        embedding = extract_embedding(image_bytes, ACTIVE_EMBEDDING_VERSION)
-    except ValueError as e:
-        msg = str(e)
-        if "no_nose_detected" in msg:
-            raise HTTPException(status_code=422, detail="no_nose_detected")
-        raise HTTPException(status_code=422, detail=msg)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    # Read into memory as BGR array
+    image_bgr = await read_upload_as_array(nose_image)
+
+    # Run full validation pipeline (quality → dog detection → nose detection)
+    # ImageValidationError is caught by the global exception handler in main.py
+    nose_model = get_nose_detector()
+    nose_crop = run_full_validation(nose_model, image_bgr)
+
+    # Extract embedding from cropped nose
+    embedding = get_embedding(nose_crop)
 
     # Query pgvector via the match_all_dogs RPC function
     supabase = get_service_supabase()
@@ -379,8 +391,20 @@ async def identify_dog(
         logger.error(f"pgvector match query failed: {e}")
         raise HTTPException(status_code=500, detail="Database query failed")
 
-    if not res.data:
-        return {"match": False, "message": "No matching dog found", "confidence": 0.0}
+    if not res.data or len(res.data) == 0:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "match": False,
+                "matched": False,
+                "code": "NO_MATCH",
+                "message": (
+                    "This dog is not in the database yet. "
+                    "Please enroll them first using the Enroll option."
+                ),
+                "confidence": 0.0,
+            }
+        )
 
     matches = [
         MatchCandidate(
@@ -402,7 +426,19 @@ async def identify_dog(
 
     # Check if top result meets threshold
     if matches[0].similarity < MATCH_THRESHOLD:
-        return {"match": False, "message": "No matching dog found", "confidence": matches[0].similarity}
+        return JSONResponse(
+            status_code=200,
+            content={
+                "match": False,
+                "matched": False,
+                "code": "NO_MATCH",
+                "message": (
+                    "This dog is not in the database yet. "
+                    "Please enroll them first using the Enroll option."
+                ),
+                "confidence": matches[0].similarity,
+            }
+        )
 
     # Log successful match
     try:
@@ -417,4 +453,11 @@ async def identify_dog(
     except Exception as e:
         logger.error(f"Failed to log scan: {e}")
 
-    return {"match": True, "message": "Match found", "confidence": matches[0].similarity, "dog": matches[0].dict()}
+    return {
+        "match": True,
+        "matched": True,
+        "message": "Match found",
+        "confidence": matches[0].similarity,
+        "confidence_pct": f"{matches[0].similarity * 100:.1f}%",
+        "dog": matches[0].dict(),
+    }

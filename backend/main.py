@@ -19,22 +19,23 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Startup lifespan: load ONNX models once into memory.
-    Models are loaded via the inference module's init_models().
+    Startup lifespan: pre-load all ML models into memory.
+    Models loaded: COCO dog detector, custom nose detector (best.pt),
+    and MegaDescriptor embedder.
     """
     from services.inference import init_models, models_ready
 
-    logger.info("Starting model initialization...")
+    logger.info("Starting DogNose backend...")
     init_models()
 
     if models_ready():
-        logger.info("All ONNX models loaded successfully. Inference enabled.")
+        logger.info("All ML models loaded successfully. Inference enabled.")
     else:
-        logger.error("Some ONNX models failed to load. Inference endpoints will return 503.")
+        logger.error("Some ML models failed to load. Inference endpoints will return 503.")
 
     yield
 
-    logger.info("Shutting down — releasing model resources.")
+    logger.info("Shutting down.")
 
 
 limiter = Limiter(key_func=get_remote_address)
@@ -42,7 +43,7 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title="CANID API",
     description="Dog nose-print biometric identification backend",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -58,6 +59,36 @@ app.add_middleware(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+
+# --- Structured exception handlers ---
+
+from services.validator import ImageValidationError
+
+
+@app.exception_handler(ImageValidationError)
+async def validation_error_handler(request: Request, exc: ImageValidationError):
+    """Return structured 422 for image validation failures."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": True,
+            "code": exc.code,
+            "message": exc.message
+        }
+    )
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    """Return structured 400 for bad input (e.g. undecodable image)."""
+    return JSONResponse(
+        status_code=400,
+        content={
+            "error": True,
+            "code": "BAD_INPUT",
+            "message": str(exc)
+        }
+    )
 
 
 # Import and include routers
@@ -84,7 +115,9 @@ async def check_models_for_inference(request: Request, call_next):
             return JSONResponse(
                 status_code=503,
                 content={
-                    "detail": "ML models are currently unavailable. The server may still be starting up."
+                    "error": True,
+                    "code": "MODELS_LOADING",
+                    "message": "ML models are currently unavailable. The server may still be starting up."
                 },
             )
     response = await call_next(request)

@@ -8,7 +8,7 @@ import { identifyNose, ApiError } from '../../lib/api'
 import NetworkError from '../components/NetworkError'
 import { toast } from 'sonner'
 
-type IdentifyStatus = 'idle' | 'processing' | 'match' | 'no_match' | 'error'
+type IdentifyStatus = 'idle' | 'processing' | 'match' | 'no_match' | 'validation_error' | 'error'
 
 interface MatchCandidate {
   dog_id: string
@@ -28,15 +28,70 @@ interface MatchCandidate {
 
 interface IdentifyResult {
   match: boolean
+  matched?: boolean
   message: string
   confidence?: number
+  confidence_pct?: string
   dog?: MatchCandidate
+  error?: boolean
+  code?: string
+}
+
+// Error code → user-facing message and icon
+const ERROR_MESSAGES: Record<string, { icon: string; title: string; hint: string }> = {
+  BLURRY: {
+    icon: "📸",
+    title: "Image too blurry",
+    hint: "Hold the camera steady and wait for it to focus before capturing."
+  },
+  DARK: {
+    icon: "💡",
+    title: "Too dark",
+    hint: "Move to a brighter area or turn on a light above the dog."
+  },
+  NOT_A_DOG: {
+    icon: "🐾",
+    title: "No dog detected",
+    hint: "Make sure your dog is clearly visible in the photo."
+  },
+  NO_NOSE: {
+    icon: "👃",
+    title: "Nose not visible",
+    hint: "Point the camera directly at your dog's nose from about 15–20 cm away."
+  },
+  NOSE_TOO_SMALL: {
+    icon: "🔍",
+    title: "Too far away",
+    hint: "Get closer — the nose should fill most of the frame."
+  },
+  NO_MATCH: {
+    icon: "❓",
+    title: "Dog not recognized",
+    hint: "This dog isn't enrolled yet. Use the Enroll option to register them first."
+  },
+  BAD_INPUT: {
+    icon: "⚠️",
+    title: "Invalid image",
+    hint: "Please upload a JPEG or PNG photo."
+  },
+  MODELS_LOADING: {
+    icon: "⏳",
+    title: "System starting up",
+    hint: "The ML models are still loading. Please wait a moment and try again."
+  }
+}
+
+interface ValidationError {
+  icon: string
+  title: string
+  hint: string
 }
 
 export default function IdentifyPage() {
   const [status, setStatus] = useState<IdentifyStatus>('idle')
   const [result, setResult] = useState<IdentifyResult | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
+  const [validationError, setValidationError] = useState<ValidationError | null>(null)
   const [processingStep, setProcessingStep] = useState(0)
   const [isWaking, setIsWaking] = useState(false)
   const [stats, setStats] = useState({ registered_dogs: 0 })
@@ -81,11 +136,38 @@ export default function IdentifyPage() {
 
   const handleCapture = async (blobData: Blob | Blob[]) => {
     const blob = Array.isArray(blobData) ? blobData[0] : blobData
+
+    // Reset all previous state
+    setResult(null)
+    setError(null)
+    setValidationError(null)
     setStatus('processing')
     setIsWaking(false)
 
     try {
       const data = await identifyNose(blob)
+
+      // Check for structured validation errors (422 responses returned as JSON)
+      if (data.error) {
+        const info = ERROR_MESSAGES[data.code] ?? {
+          icon: "⚠️",
+          title: "Something went wrong",
+          hint: data.message || "An unexpected error occurred."
+        }
+        setValidationError(info)
+        setStatus('validation_error')
+        return
+      }
+
+      // Check for no-match (200 with matched: false)
+      if (data.matched === false || (data.match === false && !data.error)) {
+        const info = ERROR_MESSAGES["NO_MATCH"]
+        setValidationError(info)
+        setStatus('no_match')
+        return
+      }
+
+      // Success — match found
       if (data.match && data.dog) {
         setResult(data)
         setStatus('match')
@@ -126,6 +208,13 @@ export default function IdentifyPage() {
     if (similarity >= 0.80) return 'bg-[var(--color-success)]'
     if (similarity >= 0.62) return 'bg-[var(--color-accent)]'
     return 'bg-[var(--color-warn)]'
+  }
+
+  const resetToIdle = () => {
+    setStatus('idle')
+    setResult(null)
+    setError(null)
+    setValidationError(null)
   }
 
   return (
@@ -219,6 +308,31 @@ export default function IdentifyPage() {
           </motion.div>
         )}
 
+        {/* Validation Error State — specific, actionable feedback */}
+        {status === 'validation_error' && validationError && (
+          <motion.div 
+            key="validation_error"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center w-full max-w-md relative z-10"
+          >
+            <div className="w-24 h-24 rounded-full bg-[var(--color-surface)] border-2 border-[var(--color-warn)] flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(234,179,8,0.15)]">
+              <span className="text-4xl">{validationError.icon}</span>
+            </div>
+            <h2 className="text-3xl font-bold font-display text-[var(--color-text)] mb-3">{validationError.title}</h2>
+            <p className="text-[var(--color-muted)] mb-10 text-center max-w-sm">{validationError.hint}</p>
+            
+            <div className="w-full flex flex-col sm:flex-row gap-4">
+              <button 
+                onClick={resetToIdle}
+                className="flex-1 py-4 bg-[var(--color-accent)] text-white text-center rounded-xl font-semibold hover:bg-blue-600 transition shadow-[0_0_15px_rgba(79,156,249,0.2)]"
+              >
+                Try Again
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* No Match State */}
         {status === 'no_match' && (
           <motion.div 
@@ -228,17 +342,17 @@ export default function IdentifyPage() {
             className="flex flex-col items-center w-full max-w-md relative z-10"
           >
             <div className="w-24 h-24 rounded-full bg-[var(--color-surface)] border-2 border-[var(--color-warn)] flex items-center justify-center mb-6">
-              <AlertTriangle className="w-10 h-10 text-[var(--color-warn)]" />
+              <span className="text-4xl">❓</span>
             </div>
-            <h2 className="text-3xl font-bold font-display text-[var(--color-text)] mb-3">No match found</h2>
-            <p className="text-[var(--color-muted)] mb-10 text-center">We couldn't find a dog with this nose print in our registry.</p>
+            <h2 className="text-3xl font-bold font-display text-[var(--color-text)] mb-3">Dog not recognized</h2>
+            <p className="text-[var(--color-muted)] mb-10 text-center">This dog isn't enrolled yet. Register them first to enable identification.</p>
             
             <div className="w-full flex flex-col sm:flex-row gap-4">
               <Link href="/enroll" className="flex-1 py-4 bg-[var(--color-accent)] text-white text-center rounded-xl font-semibold hover:bg-blue-600 transition shadow-[0_0_15px_rgba(79,156,249,0.2)]">
                 Register this dog
               </Link>
               <button 
-                onClick={() => setStatus('idle')}
+                onClick={resetToIdle}
                 className="flex-1 py-4 bg-transparent border border-[var(--color-border)] text-[var(--color-text)] rounded-xl font-semibold hover:bg-[var(--color-surface)] transition"
               >
                 Try again
@@ -318,7 +432,7 @@ export default function IdentifyPage() {
 
             <div className="mt-6 flex flex-col gap-4">
               <button 
-                onClick={() => { setStatus('idle'); setResult(null) }}
+                onClick={resetToIdle}
                 className="w-full py-4 bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] rounded-xl font-semibold hover:bg-[var(--color-border)] transition"
               >
                 Scan Another Dog
@@ -334,7 +448,7 @@ export default function IdentifyPage() {
           </motion.div>
         )}
 
-        {/* Error */}
+        {/* Network/Server Error */}
         {status === 'error' && error && (
           <motion.div 
             key="error"
@@ -343,7 +457,7 @@ export default function IdentifyPage() {
           >
             <NetworkError 
               error={error} 
-              onRetry={async () => setStatus('idle')} 
+              onRetry={async () => resetToIdle()} 
             />
           </motion.div>
         )}

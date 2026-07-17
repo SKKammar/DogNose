@@ -1,67 +1,24 @@
--- =============================================================================
--- DogNose (CANID) — Complete Database Schema
--- =============================================================================
--- Run this ENTIRE file in your Supabase Dashboard → SQL Editor → New Query → Run
--- This creates all tables, indexes, RLS policies, and match functions.
--- =============================================================================
+-- ============================================================
+-- DogNose: Migrate embedding dimension 512 → 1536
+-- Run this ONCE in Supabase SQL Editor before redeploying.
+-- WARNING: Existing embeddings are wiped (incompatible dims).
+--          Re-enroll all dogs after deploying the new backend.
+-- ============================================================
 
--- 1. Enable required extensions
-CREATE EXTENSION IF NOT EXISTS vector;
+-- 1. Drop old vector index
+DROP INDEX IF EXISTS dogs_embedding_idx;
 
--- 2. Create dogs table
-CREATE TABLE IF NOT EXISTS dogs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    breed TEXT,
-    age NUMERIC,
-    sex TEXT,
-    color_markings TEXT,
-    owner_name TEXT,
-    owner_phone TEXT,
-    owner_email TEXT,
-    microchip_id TEXT,
-    notes TEXT,
-    embedding vector(1536),
-    embedding_version TEXT DEFAULT 'megadescriptor-v1',
-    is_lost BOOLEAN NOT NULL DEFAULT false,
-    lost_since TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- 2. Alter column: set to NULL first (old 512-dim values are incompatible)
+ALTER TABLE dogs
+  ALTER COLUMN embedding TYPE vector(1536) USING NULL;
 
--- 3. Create pgvector index for fast cosine similarity search
-CREATE INDEX IF NOT EXISTS dogs_embedding_idx
-    ON dogs USING hnsw (embedding vector_cosine_ops);
+-- 3. Recreate HNSW index for cosine similarity (faster than IVFFlat for small datasets)
+CREATE INDEX dogs_embedding_idx
+  ON dogs USING hnsw (embedding vector_cosine_ops);
 
--- =============================================================================
--- 4. Row Level Security
--- =============================================================================
+-- 4. Replace the match_all_dogs function with 1536-dim signature
+DROP FUNCTION IF EXISTS public.match_all_dogs(vector(512), float, int, text);
 
-ALTER TABLE dogs ENABLE ROW LEVEL SECURITY;
-
--- Dogs: users can only manage their own dogs
-CREATE POLICY "Users can view their own dogs"
-    ON dogs FOR SELECT
-    USING (auth.uid() = owner);
-
-CREATE POLICY "Users can insert their own dogs"
-    ON dogs FOR INSERT
-    WITH CHECK (auth.uid() = owner);
-
-CREATE POLICY "Users can update their own dogs"
-    ON dogs FOR UPDATE
-    USING (auth.uid() = owner)
-    WITH CHECK (auth.uid() = owner);
-
-CREATE POLICY "Users can delete their own dogs"
-    ON dogs FOR DELETE
-    USING (auth.uid() = owner);
-
--- =============================================================================
--- 5. Match functions (SECURITY DEFINER — bypass RLS for server-side queries)
--- =============================================================================
-
--- Match ALL enrolled dogs (used by /dogs/identify endpoint)
 CREATE OR REPLACE FUNCTION public.match_all_dogs(
     query_embedding vector(1536),
     match_threshold float,
@@ -128,7 +85,9 @@ $$;
 GRANT EXECUTE ON FUNCTION public.match_all_dogs(vector(1536), float, int, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.match_all_dogs(vector(1536), float, int, text) TO anon;
 
--- Match only LOST dogs (used by the lost-dog finder feature)
+-- 5. Replace the match_lost_dogs function with 1536-dim signature
+DROP FUNCTION IF EXISTS public.match_lost_dogs(vector(512), float, int, text);
+
 CREATE OR REPLACE FUNCTION public.match_lost_dogs(
     query_embedding vector(1536),
     match_threshold float,
@@ -181,3 +140,8 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.match_lost_dogs(vector(1536), float, int, text) TO anon;
 GRANT EXECUTE ON FUNCTION public.match_lost_dogs(vector(1536), float, int, text) TO service_role;
+
+-- 6. Verify the migration
+SELECT column_name, data_type, udt_name
+FROM information_schema.columns
+WHERE table_name = 'dogs' AND column_name = 'embedding';

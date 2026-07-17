@@ -95,18 +95,32 @@ export default function EnrollPage() {
       }, token)
 
       const blobs = photos.map(p => p.blob)
-      try {
-        await enrollNose(dogData.id, blobs, token)
-        setPhotos(prev => prev.map(p => ({ ...p, status: 'success' })))
-      } catch (enrollErr: any) {
-        const detail = enrollErr?.message || enrollErr?.detail || 'Unknown error'
-        if (detail.includes('No valid nose prints detected')) {
-           setPhotos(prev => prev.map(p => ({ ...p, status: 'error', error: 'No nose found in any photo — retake' })))
-           setStep('capture')
-           return
+      const enrollResult = await enrollNose(dogData.id, blobs, token)
+
+      // Check for structured validation errors from the new pipeline
+      if (enrollResult.error) {
+        const errorCode = enrollResult.code || 'UNKNOWN'
+        const photoErrors = enrollResult.photo_errors || []
+
+        if (errorCode === 'NO_VALID_PHOTOS') {
+          // Mark individual photos with their specific error messages
+          setPhotos(prev => prev.map((p, idx) => {
+            const photoErr = photoErrors.find((e: any) => e.photo === idx + 1)
+            const errorMsg = photoErr
+              ? `${photoErr.code}: ${photoErr.message}`
+              : 'No valid nose detected — retake'
+            return { ...p, status: 'error', error: errorMsg }
+          }))
+          setStep('capture')
+          return
         }
-        throw enrollErr
+
+        // Other structured errors
+        throw { type: 'validation', message: enrollResult.message || 'Enrollment failed' }
       }
+
+      // Mark successfully processed photos
+      setPhotos(prev => prev.map(p => ({ ...p, status: 'success' })))
 
       setEnrolledDogName(name)
       setStep('success')
