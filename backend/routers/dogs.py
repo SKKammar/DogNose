@@ -237,6 +237,7 @@ async def enroll_dog(
     nose_model = get_nose_detector()
     valid_embeddings = []
     errors = []
+    profile_photo_url = None
 
     for i, nose_image in enumerate(nose_images):
         try:
@@ -252,6 +253,16 @@ async def enroll_dog(
             # Extract embedding from cropped nose
             embedding = get_embedding(nose_crop)
             valid_embeddings.append(embedding)
+
+            # Save the first valid photo as the profile photo
+            if profile_photo_url is None:
+                import cv2
+                import os
+                upload_dir = "static/uploads"
+                os.makedirs(upload_dir, exist_ok=True)
+                file_path = os.path.join(upload_dir, f"{dog_id}.jpg")
+                cv2.imwrite(file_path, image_bgr)
+                profile_photo_url = f"{request.base_url.scheme}://{request.base_url.netloc}/static/uploads/{dog_id}.jpg"
         except ImageValidationError as e:
             logger.warning(f"Photo {i+1} for {dog_id} failed validation: [{e.code}] {e.message}")
             errors.append({"photo": i + 1, "code": e.code, "message": e.message})
@@ -285,6 +296,8 @@ async def enroll_dog(
         "embedding": avg_embedding.tolist(),
         "embedding_version": ACTIVE_EMBEDDING_VERSION,
     }
+    if profile_photo_url:
+        data["profile_photo_url"] = profile_photo_url
 
     try:
         res = supabase.table("dogs").update(data).eq("id", dog_id).execute()

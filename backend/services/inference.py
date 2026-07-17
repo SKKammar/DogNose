@@ -11,8 +11,6 @@ import os
 import cv2
 import numpy as np
 import torch
-torch.set_num_threads(1)  # Limit threads to save memory on Render free tier
-torch.set_grad_enabled(False) # Disable gradients globally to save memory
 import torch.nn.functional as F
 import torchvision.transforms as T
 from PIL import Image

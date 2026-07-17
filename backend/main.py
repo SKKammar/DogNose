@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -11,12 +12,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Restrict threads to save memory on Render's 512MB free tier
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("uvicorn").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -99,6 +94,9 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 # Import and include routers
 from routers import dogs, stats, validate, report  # noqa: E402
+
+os.makedirs("static/uploads", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(dogs.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
