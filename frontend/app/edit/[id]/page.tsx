@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, use } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { getDog, updateDog } from '../../../lib/api'
 import { useRouter } from 'next/navigation'
@@ -8,7 +8,8 @@ import { Loader2, Save, X, Edit3 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
-export default function EditDogPage({ params }: { params: { id: string } }) {
+export default function EditDogPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -37,7 +38,7 @@ export default function EditDogPage({ params }: { params: { id: string } }) {
         }
         setSessionToken(session.access_token)
 
-        const dogData = await getDog(params.id, session.access_token)
+        const dogData = await getDog(id, session.access_token)
         
         setName(dogData.name || '')
         setBreed(dogData.breed || '')
@@ -60,7 +61,7 @@ export default function EditDogPage({ params }: { params: { id: string } }) {
     }
 
     fetchDog()
-  }, [params.id, router])
+  }, [id, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -81,7 +82,7 @@ export default function EditDogPage({ params }: { params: { id: string } }) {
         notes: notes || null
       }
 
-      await updateDog(params.id, updateData, sessionToken)
+      await updateDog(id, updateData, sessionToken)
       toast.success('Dog profile updated successfully')
       router.push('/dashboard')
     } catch (err: any) {
