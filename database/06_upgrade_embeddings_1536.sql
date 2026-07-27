@@ -35,6 +35,7 @@ RETURNS TABLE (
     owner_name TEXT,
     owner_phone TEXT,
     owner_email TEXT,
+    profile_photo_url TEXT,
     similarity FLOAT
 )
 SECURITY DEFINER
@@ -54,6 +55,7 @@ BEGIN
             d.owner_name,
             d.owner_phone,
             d.owner_email,
+            d.profile_photo_url,
             1 - (d.embedding <=> query_embedding) AS similarity,
             ROW_NUMBER() OVER (
                 PARTITION BY d.id
@@ -74,6 +76,7 @@ BEGIN
         rm.owner_name,
         rm.owner_phone,
         rm.owner_email,
+        rm.profile_photo_url,
         rm.similarity
     FROM ranked_matches rm
     WHERE rm.rn = 1
@@ -98,6 +101,7 @@ RETURNS TABLE (
     dog_id UUID,
     name TEXT,
     breed TEXT,
+    profile_photo_url TEXT,
     confidence FLOAT
 )
 SECURITY DEFINER
@@ -111,6 +115,7 @@ BEGIN
             d.id AS dog_id,
             d.name,
             d.breed,
+            d.profile_photo_url,
             1 - (d.embedding <=> query_embedding) AS confidence
         FROM dogs d
         WHERE d.is_lost = true
@@ -123,14 +128,16 @@ BEGIN
             m.dog_id,
             m.name,
             m.breed,
+            m.profile_photo_url,
             MAX(m.confidence) AS confidence
         FROM matches m
-        GROUP BY m.dog_id, m.name, m.breed
+        GROUP BY m.dog_id, m.name, m.breed, m.profile_photo_url
     )
     SELECT
         bm.dog_id,
         bm.name,
         bm.breed,
+        bm.profile_photo_url,
         bm.confidence
     FROM best_matches bm
     ORDER BY bm.confidence DESC

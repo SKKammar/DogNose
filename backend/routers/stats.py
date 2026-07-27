@@ -25,7 +25,7 @@ def get_stats():
         registered_dogs = dogs_res.count if dogs_res.count is not None else 0
         
         # Count of matches made
-        matches_res = supabase.table("scan_logs").select("id", count="exact").not_.is_("matched_dog_id", "null").limit(1).execute()
+        matches_res = supabase.table("scan_logs").select("id", count="exact").not_("matched_dog_id", "is", "null").limit(1).execute()
         matches_made = matches_res.count if matches_res.count is not None else 0
         
         # For reunites, we could just say it's proportional or the same as matches
