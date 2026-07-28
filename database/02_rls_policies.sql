@@ -6,23 +6,23 @@ ALTER TABLE nose_prints ENABLE ROW LEVEL SECURITY;
 -- Users can only select their own dogs
 CREATE POLICY "Users can view their own dogs"
     ON dogs FOR SELECT
-    USING (auth.uid() = owner_id);
+    USING (auth.uid() = owner);
 
 -- Users can insert their own dogs
 CREATE POLICY "Users can insert their own dogs"
     ON dogs FOR INSERT
-    WITH CHECK (auth.uid() = owner_id);
+    WITH CHECK (auth.uid() = owner);
 
 -- Users can update their own dogs
 CREATE POLICY "Users can update their own dogs"
     ON dogs FOR UPDATE
-    USING (auth.uid() = owner_id)
-    WITH CHECK (auth.uid() = owner_id);
+    USING (auth.uid() = owner)
+    WITH CHECK (auth.uid() = owner);
 
 -- Users can delete their own dogs
 CREATE POLICY "Users can delete their own dogs"
     ON dogs FOR DELETE
-    USING (auth.uid() = owner_id);
+    USING (auth.uid() = owner);
 
 
 -- Policies for nose_prints table
@@ -33,7 +33,7 @@ CREATE POLICY "Users can view their dogs nose prints"
         EXISTS (
             SELECT 1 FROM dogs
             WHERE dogs.id = nose_prints.dog_id
-            AND dogs.owner_id = auth.uid()
+            AND dogs.owner = auth.uid()
         )
     );
 
@@ -44,7 +44,7 @@ CREATE POLICY "Users can insert their dogs nose prints"
         EXISTS (
             SELECT 1 FROM dogs
             WHERE dogs.id = nose_prints.dog_id
-            AND dogs.owner_id = auth.uid()
+            AND dogs.owner = auth.uid()
         )
     );
 
@@ -55,14 +55,14 @@ CREATE POLICY "Users can update their dogs nose prints"
         EXISTS (
             SELECT 1 FROM dogs
             WHERE dogs.id = nose_prints.dog_id
-            AND dogs.owner_id = auth.uid()
+            AND dogs.owner = auth.uid()
         )
     )
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM dogs
             WHERE dogs.id = nose_prints.dog_id
-            AND dogs.owner_id = auth.uid()
+            AND dogs.owner = auth.uid()
         )
     );
 
@@ -73,6 +73,6 @@ CREATE POLICY "Users can delete their dogs nose prints"
         EXISTS (
             SELECT 1 FROM dogs
             WHERE dogs.id = nose_prints.dog_id
-            AND dogs.owner_id = auth.uid()
+            AND dogs.owner = auth.uid()
         )
     );

@@ -192,3 +192,35 @@ export async function updateDog(dogId: string, details: Partial<DogDetails>, tok
   })
   return res.json()
 }
+
+/**
+ * Wraps an API call with cold-start polling.
+ */
+export async function callWithWakeUp<T>(
+  apiCall: () => Promise<T>,
+  onWakeUpStatus: (isWaking: boolean) => void
+): Promise<T> {
+  try {
+    return await apiCall()
+  } catch (error: any) {
+    if (error.type === 'timeout' || (error.type === 'server' && error.message.includes('cold-start'))) {
+      onWakeUpStatus(true)
+      // Poll health endpoint every 3 seconds
+      while (true) {
+        try {
+          const res = await fetch(`${API_URL}/health`, { cache: 'no-store' })
+          if (res.ok) {
+            const data = await res.json()
+            if (data.models_ready) break
+          }
+        } catch (e) {
+          // ignore fetch errors while polling
+        }
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
+      onWakeUpStatus(false)
+      return await apiCall()
+    }
+    throw error
+  }
+}

@@ -25,7 +25,7 @@ def get_service_supabase() -> Client:
     where the backend needs to insert/query on behalf of a verified user.
     """
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
-        raise HTTPException(status_code=500, detail="Supabase service role configuration missing")
+        raise HTTPException(status_code=500, detail={"code": "CONFIG_ERROR", "message": "Supabase service role configuration missing"})
     return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 
@@ -35,7 +35,7 @@ def get_supabase(credentials: HTTPAuthorizationCredentials = Security(security))
     Uses the anon key for client creation, then sets the user's token for RLS.
     """
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-        raise HTTPException(status_code=500, detail="Supabase configuration missing")
+        raise HTTPException(status_code=500, detail={"code": "CONFIG_ERROR", "message": "Supabase configuration missing"})
 
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
     supabase.postgrest.auth(credentials.credentials)
@@ -45,7 +45,7 @@ def get_supabase(credentials: HTTPAuthorizationCredentials = Security(security))
 def get_anon_supabase() -> Client:
     """Returns an unauthenticated Supabase client (anon key only)."""
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-        raise HTTPException(status_code=500, detail="Supabase configuration missing")
+        raise HTTPException(status_code=500, detail={"code": "CONFIG_ERROR", "message": "Supabase configuration missing"})
     return create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 
@@ -63,11 +63,11 @@ def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -
         )
         user_id = payload.get("sub")
         if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
+            raise HTTPException(status_code=401, detail={"code": "UNAUTHORIZED", "message": "Invalid token: missing user ID"})
         return user_id
     except Exception as e:
         logger.error(f"JWT verification failed with exception: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail={"code": "UNAUTHORIZED", "message": "Invalid or expired token"})
 
 def get_current_user_id(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
     """

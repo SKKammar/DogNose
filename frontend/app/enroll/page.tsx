@@ -5,7 +5,7 @@ import { Loader2, AlertTriangle, CheckCircle2, Fingerprint, X, ChevronLeft, Shie
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
-import { registerDog, enrollNose, ApiError } from '../../lib/api'
+import { registerDog, enrollNose, callWithWakeUp, ApiError } from '../../lib/api'
 import NetworkError from '../components/NetworkError'
 
 type EnrollStep = 'details' | 'capture' | 'uploading' | 'success' | 'error'
@@ -79,9 +79,7 @@ export default function EnrollPage() {
       }
       const token = session.access_token
 
-      const wakeTimer = setTimeout(() => setIsWakingUp(true), 3000)
-
-      const dogData = await registerDog({
+      const dogData = await callWithWakeUp(() => registerDog({
         name,
         breed: breed || null,
         age: age === '' ? null : Number(age),
@@ -92,10 +90,10 @@ export default function EnrollPage() {
         owner_email: ownerEmail || null,
         microchip_id: microchipId || null,
         notes: notes || null
-      }, token)
+      }, token), setIsWakingUp)
 
       const blobs = photos.map(p => p.blob)
-      const enrollResult = await enrollNose(dogData.id, blobs, token)
+      const enrollResult = await callWithWakeUp(() => enrollNose(dogData.id, blobs, token), setIsWakingUp)
 
       // Check for structured validation errors from the new pipeline
       if (enrollResult.error) {

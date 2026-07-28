@@ -39,4 +39,4 @@ def report_incorrect_match(
         return {"success": True, "message": "Report submitted successfully"}
     except Exception as e:
         logger.error(f"Failed to submit report: {e}")
-        raise HTTPException(status_code=500, detail="Failed to submit report")
+        raise HTTPException(status_code=500, detail={"code": "REPORT_FAILED", "message": "Failed to submit report"})

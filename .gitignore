@@ -32,3 +32,5 @@ out/
 
 # Data
 dataset/
+
+.hf_cache/

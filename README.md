@@ -1,4 +1,4 @@
-# DoGNose
+﻿# DoGNose
 
 DoGNose is a biometric identification system that acts like a fingerprint scanner for dogs. By capturing an image of a dog's nose, the system extracts a unique "nose print" embedding using machine learning, allowing you to register and subsequently identify dogs non-invasively.
 

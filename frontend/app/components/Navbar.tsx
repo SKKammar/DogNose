@@ -69,7 +69,7 @@ export default function Navbar() {
                 key={link.name}
                 href={link.href}
                 className={`text-sm font-medium transition-colors ${
-                  pathname === link.href
+                  (link.href === '/' ? pathname === '/' : pathname?.startsWith(link.href))
                     ? 'text-[var(--color-accent)] border-b-2 border-[var(--color-accent)] py-1'
                     : 'text-[var(--color-text)] hover:text-[var(--color-accent)]'
                 }`}
@@ -115,7 +115,7 @@ export default function Navbar() {
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  pathname === link.href
+                  (link.href === '/' ? pathname === '/' : pathname?.startsWith(link.href))
                     ? 'text-[var(--color-accent)] bg-[var(--color-bg)]'
                     : 'text-[var(--color-text)] hover:bg-[var(--color-bg)]'
                 }`}

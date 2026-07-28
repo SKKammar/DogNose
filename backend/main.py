@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -11,12 +12,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Restrict threads to save memory on Render's 512MB free tier
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("uvicorn").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -32,6 +27,11 @@ async def lifespan(app: FastAPI):
     from services.inference import init_models, models_ready
 
     logger.info("Starting DogNose backend...")
+    
+    # Task 2.6 Log match threshold
+    threshold = os.getenv("MATCH_THRESHOLD", "0.62")
+    logger.info(f"Match threshold: {threshold}")
+    
     init_models()
 
     if models_ready():
@@ -56,15 +56,23 @@ app = FastAPI(
 # CORS MUST be first
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://dog-nose.vercel.app", "http://localhost:3000"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+import time
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    elapsed_ms = int((time.time() - start_time) * 1000)
+    logger.info(f"{request.method} {request.url.path} → {response.status_code} in {elapsed_ms}ms")
+    return response
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 
 # --- Structured exception handlers ---
 
@@ -100,6 +108,9 @@ async def value_error_handler(request: Request, exc: ValueError):
 # Import and include routers
 from routers import dogs, stats, validate, report  # noqa: E402
 
+os.makedirs("static/uploads", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.include_router(dogs.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(validate.router, prefix="/api")
@@ -131,8 +142,12 @@ async def check_models_for_inference(request: Request, call_next):
 
 
 @app.get("/health")
-def health_check():
-    """Health check endpoint for Render. Returns model readiness status."""
+async def health():
     from services.inference import models_ready
-
-    return {"status": "ok", "models_loaded": models_ready()}
+    return {
+        "status": "ok",
+        "models_ready": models_ready(),
+        "embedding_dim": 1536,
+        "model": "MegaDescriptor-T-CNN-288",
+        "version": "1.0.0"
+    }

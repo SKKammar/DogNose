@@ -118,14 +118,14 @@ async def validate_upload_metadata(request: Request, file: UploadFile) -> None:
     if file.content_type not in ALLOWED_UPLOAD_TYPES:
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_UPLOAD_TYPES)}",
+            detail={"code": "VALIDATION_ERROR", "message": f"Invalid file type. Allowed: {', '.join(ALLOWED_UPLOAD_TYPES)}"},
         )
 
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > MAX_SIZE_BYTES:
         raise HTTPException(
             status_code=422,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB.",
+            detail={"code": "VALIDATION_ERROR", "message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB."},
         )
 
 
@@ -158,7 +158,7 @@ def register_dog(
 
     res = supabase.table("dogs").insert(data).execute()
     if not res.data:
-        raise HTTPException(status_code=500, detail="Failed to create dog")
+        raise HTTPException(status_code=500, detail={"code": "CREATE_FAILED", "message": "Failed to create dog"})
 
     row = res.data[0]
     return DogResponse(
@@ -231,12 +231,13 @@ async def enroll_dog(
     )
     if not dog_check.data:
         raise HTTPException(
-            status_code=403, detail="Dog not found or you don't own this dog"
+            status_code=403, detail={"code": "UNAUTHORIZED", "message": "You do not have permission to access this resource."}
         )
 
     nose_model = get_nose_detector()
     valid_embeddings = []
     errors = []
+    profile_photo_url = None
 
     for i, nose_image in enumerate(nose_images):
         try:
@@ -252,6 +253,16 @@ async def enroll_dog(
             # Extract embedding from cropped nose
             embedding = get_embedding(nose_crop)
             valid_embeddings.append(embedding)
+
+            # Save the first valid photo as the profile photo
+            if profile_photo_url is None:
+                import cv2
+                import os
+                upload_dir = "static/uploads"
+                os.makedirs(upload_dir, exist_ok=True)
+                file_path = os.path.join(upload_dir, f"{dog_id}.jpg")
+                cv2.imwrite(file_path, image_bgr)
+                profile_photo_url = f"{request.base_url.scheme}://{request.base_url.netloc}/static/uploads/{dog_id}.jpg"
         except ImageValidationError as e:
             logger.warning(f"Photo {i+1} for {dog_id} failed validation: [{e.code}] {e.message}")
             errors.append({"photo": i + 1, "code": e.code, "message": e.message})
@@ -285,17 +296,19 @@ async def enroll_dog(
         "embedding": avg_embedding.tolist(),
         "embedding_version": ACTIVE_EMBEDDING_VERSION,
     }
+    if profile_photo_url:
+        data["profile_photo_url"] = profile_photo_url
 
     try:
         res = supabase.table("dogs").update(data).eq("id", dog_id).execute()
     except Exception as e:
         logger.error(f"Failed to update dog embedding: {e}")
         raise HTTPException(
-            status_code=500, detail="Failed to store nose print embedding"
+            status_code=500, detail={"code": "EMBEDDING_FAILED", "message": "Could not generate embedding. Check image quality."}
         )
 
     if not res.data:
-        raise HTTPException(status_code=500, detail="Failed to enroll dog")
+        raise HTTPException(status_code=500, detail={"code": "ENROLL_FAILED", "message": "Failed to enroll dog"})
 
     return {
         "nose_print_id": dog_id,
@@ -311,7 +324,7 @@ def get_dog(dog_id: str, user_id: str = Depends(get_current_user_id)):
     supabase = get_service_supabase()
     res = supabase.table("dogs").select("*").eq("id", dog_id).eq("owner", user_id).execute()
     if not res.data:
-        raise HTTPException(status_code=404, detail="Dog not found")
+        raise HTTPException(status_code=404, detail={"code": "DOG_NOT_FOUND", "message": "No dog found with that ID."})
     row = res.data[0]
     return DogResponse(**row)
 
@@ -323,7 +336,7 @@ def delete_dog(dog_id: str, user_id: str = Depends(get_current_user_id)):
     # verify ownership
     check = supabase.table("dogs").select("id").eq("id", dog_id).eq("owner", user_id).execute()
     if not check.data:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise HTTPException(status_code=403, detail={"code": "UNAUTHORIZED", "message": "You do not have permission to access this resource."})
     # Due to ON DELETE CASCADE on potential FKs, this might be simpler.
     # Note: supabase storage deletion is omitted for simplicity in this endpoint,
     # could be added via supabase storage API if required.
@@ -342,7 +355,7 @@ def update_dog(
     # verify ownership
     check = supabase.table("dogs").select("id").eq("id", dog_id).eq("owner", user_id).execute()
     if not check.data:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise HTTPException(status_code=403, detail={"code": "UNAUTHORIZED", "message": "You do not have permission to access this resource."})
     
     # Filter out None values to only update provided fields
     update_data = {k: v for k, v in dog.dict().items() if v is not None}
@@ -352,7 +365,7 @@ def update_dog(
         
     res = supabase.table("dogs").update(update_data).eq("id", dog_id).execute()
     if not res.data:
-        raise HTTPException(status_code=500, detail="Failed to update dog")
+        raise HTTPException(status_code=500, detail={"code": "UPDATE_FAILED", "message": "Failed to update dog"})
         
     row = res.data[0]
     return DogResponse(**row)
@@ -362,7 +375,7 @@ def update_dog(
 def get_scan_logs(user_id: str = Depends(get_current_user_id)):
     """Return scan events for the authenticated user's dogs."""
     supabase = get_service_supabase()
-    res = supabase.rpc("get_user_scan_logs", {"p_owner_id": user_id}).execute()
+    res = supabase.rpc("get_user_scan_logs", {"p_owner": user_id}).execute()
 
     # Alternative direct approach using inner join if RPC not defined:
     # res = supabase.table("scan_logs").select("*, dogs!inner(name, owner)").eq("dogs.owner", user_id).order("scanned_at", desc=True).limit(50).execute()
@@ -430,7 +443,7 @@ async def identify_dog(
         ).execute()
     except Exception as e:
         logger.error(f"pgvector match query failed: {e}")
-        raise HTTPException(status_code=500, detail="Database query failed")
+        raise HTTPException(status_code=500, detail={"code": "DB_ERROR", "message": "Database query failed"})
 
     if not res.data or len(res.data) == 0:
         return JSONResponse(
