@@ -8,6 +8,7 @@ Output: 1536-dimensional L2-normalized embedding.
 Nose Detector: Custom YOLOv8n (best.pt) for nose localization.
 """
 import os
+os.environ["HF_HOME"] = os.path.join(os.path.dirname(__file__), ".hf_cache")
 import cv2
 import numpy as np
 import torch
@@ -57,15 +58,9 @@ def _load_nose_detector():
     """Load custom YOLO nose detector (best.pt)."""
     global _nose_detector
     if _nose_detector is None:
-        # Resolve the path relative to the backend working directory
         model_path = NOSE_MODEL_PATH
         if not os.path.exists(model_path):
-            # Try alternate common paths
-            alt_paths = ["best.pt", "../best.pt", "models/best.pt", "../models/best.pt"]
-            for alt in alt_paths:
-                if os.path.exists(alt):
-                    model_path = alt
-                    break
+            raise RuntimeError(f"Nose detector not found at '{model_path}'. Set NOSE_MODEL_PATH env var to the correct absolute path on Render.")
 
         logger.info(f"Loading nose detector model from {model_path}...")
         _nose_detector = YOLO(model_path)
@@ -78,8 +73,12 @@ def init_models():
     Pre-loads: COCO dog detector, custom nose detector, and MegaDescriptor embedder.
     """
     from services.validator import _get_coco_model
+    import time
 
     logger.info("Starting model initialization...")
+    
+    clahe_enabled = os.getenv("ENABLE_CLAHE", "false").lower() == "true"
+    logger.info(f"Nose preprocessing (CLAHE): {'enabled' if clahe_enabled else 'disabled'}")
 
     # 1. COCO dog detection model (auto-downloads yolov8n.pt)
     try:
@@ -99,8 +98,10 @@ def init_models():
         _load_embedder()
         # Warmup with a dummy image
         dummy = np.zeros((100, 100, 3), dtype=np.uint8)
-        get_embedding(dummy)
-        logger.info("Embedder warmup complete.")
+        start_t = time.time()
+        embedding = get_embedding(dummy)
+        elapsed_ms = int((time.time() - start_t) * 1000)
+        logger.info(f"Embedder warmup complete in {elapsed_ms}ms — embedding shape: {embedding.shape}")
     except Exception as e:
         logger.error(f"Failed to load embedder: {e}")
 
@@ -144,11 +145,17 @@ def get_embedding(nose_crop_bgr: np.ndarray) -> np.ndarray:
 
     This function is stateless — safe to call from multiple requests.
     """
+    if not isinstance(nose_crop_bgr, np.ndarray) or nose_crop_bgr.ndim != 3 or min(nose_crop_bgr.shape) == 0:
+        raise ValueError(f"Invalid nose crop shape: {getattr(nose_crop_bgr,'shape','unknown')}. Expected (H, W, 3) BGR.")
+
     if _embedder_model is None or _embedder_transforms is None:
         raise RuntimeError("Embedder model not loaded. Call init_models() first.")
 
-    # Enhance nose texture
-    processed = _preprocess_nose(nose_crop_bgr)
+    # Enhance nose texture if enabled
+    if os.getenv("ENABLE_CLAHE", "false").lower() == "true":
+        processed = _preprocess_nose(nose_crop_bgr)
+    else:
+        processed = nose_crop_bgr
 
     # BGR → RGB → PIL
     rgb = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
