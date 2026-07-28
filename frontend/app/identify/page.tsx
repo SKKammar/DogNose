@@ -4,7 +4,7 @@ import CameraCapture from '../components/CameraCapture'
 import { Loader2, Fingerprint, ChevronLeft, Camera, Phone, Mail, Copy, AlertTriangle, PawPrint } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { identifyNose, ApiError } from '../../lib/api'
+import { identifyNose, callWithWakeUp, ApiError } from '../../lib/api'
 import NetworkError from '../components/NetworkError'
 import { toast } from 'sonner'
 
@@ -145,7 +145,7 @@ export default function IdentifyPage() {
     setIsWaking(false)
 
     try {
-      const data = await identifyNose(blob)
+      const data = await callWithWakeUp(() => identifyNose(blob), setIsWaking)
 
       // Check for structured validation errors (422 responses returned as JSON)
       if (data.error) {

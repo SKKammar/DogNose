@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- Create dogs table
 CREATE TABLE IF NOT EXISTS dogs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    owner UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     breed TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
