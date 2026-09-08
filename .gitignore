@@ -10,6 +10,7 @@ env/
 # Environment Variables
 .env
 .env.local
+*.env
 
 # ML Models and Data (Keep weights out of Git)
 models/

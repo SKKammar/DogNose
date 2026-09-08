@@ -375,33 +375,31 @@ def update_dog(
 def get_scan_logs(user_id: str = Depends(get_current_user_id)):
     """Return scan events for the authenticated user's dogs."""
     supabase = get_service_supabase()
-    res = supabase.rpc("get_user_scan_logs", {"p_owner": user_id}).execute()
-
-    # Alternative direct approach using inner join if RPC not defined:
-    # res = supabase.table("scan_logs").select("*, dogs!inner(name, owner)").eq("dogs.owner", user_id).order("scanned_at", desc=True).limit(50).execute()
-
-    if res.data is None:
-        # fallback if rpc is not created
-        dogs_res = supabase.table("dogs").select("id, name").eq("owner", user_id).execute()
-        if not dogs_res.data:
-            return []
-        dog_ids = [d["id"] for d in dogs_res.data]
-        dog_names = {d["id"]: d["name"] for d in dogs_res.data}
-        if not dog_ids:
-            return []
-        logs_res = supabase.table("scan_logs").select("*").in_("matched_dog_id", dog_ids).order("scanned_at", desc=True).limit(50).execute()
-        if not logs_res.data:
-            return []
-
-        result = []
-        for l in logs_res.data:
-            result.append({
-                "dog_name": dog_names.get(l["matched_dog_id"], "Unknown"),
-                "similarity_score": l["similarity_score"],
-                "scanned_at": l["scanned_at"]
-            })
-        return result
-    return res.data
+    dogs_res = supabase.table("dogs").select("id, name").eq("owner", user_id).execute()
+    if not dogs_res.data:
+        return []
+    dog_ids = [d["id"] for d in dogs_res.data]
+    dog_names = {d["id"]: d["name"] for d in dogs_res.data}
+    if not dog_ids:
+        return []
+    logs_res = (
+        supabase.table("scan_logs")
+        .select("*")
+        .in_("matched_dog_id", dog_ids)
+        .order("scanned_at", desc=True)
+        .limit(50)
+        .execute()
+    )
+    if not logs_res.data:
+        return []
+    return [
+        {
+            "dog_name": dog_names.get(l["matched_dog_id"], "Unknown"),
+            "similarity_score": l["similarity_score"],
+            "scanned_at": l["scanned_at"],
+        }
+        for l in logs_res.data
+    ]
 
 
 @router.post("/identify")

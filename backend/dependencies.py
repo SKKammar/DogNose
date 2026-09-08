@@ -2,7 +2,7 @@ import os
 import logging
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from supabase import create_client, Client
+from supabase import create_client, Client, ClientOptions
 import jwt
 from jwt.exceptions import PyJWTError
 
@@ -26,7 +26,11 @@ def get_service_supabase() -> Client:
     """
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         raise HTTPException(status_code=500, detail={"code": "CONFIG_ERROR", "message": "Supabase service role configuration missing"})
-    return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    return create_client(
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY,
+        options=ClientOptions(schema="dognose")
+    )
 
 
 def get_supabase(credentials: HTTPAuthorizationCredentials = Security(security)) -> Client:
@@ -37,7 +41,11 @@ def get_supabase(credentials: HTTPAuthorizationCredentials = Security(security))
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
         raise HTTPException(status_code=500, detail={"code": "CONFIG_ERROR", "message": "Supabase configuration missing"})
 
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    supabase: Client = create_client(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+        options=ClientOptions(schema="dognose")
+    )
     supabase.postgrest.auth(credentials.credentials)
     return supabase
 
@@ -46,7 +54,11 @@ def get_anon_supabase() -> Client:
     """Returns an unauthenticated Supabase client (anon key only)."""
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
         raise HTTPException(status_code=500, detail={"code": "CONFIG_ERROR", "message": "Supabase configuration missing"})
-    return create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    return create_client(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+        options=ClientOptions(schema="dognose")
+    )
 
 
 def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
