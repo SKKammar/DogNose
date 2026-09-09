@@ -1,39 +1,70 @@
-﻿# DoGNose
+# DoGNose
 
-DoGNose is a biometric identification system that acts like a fingerprint scanner for dogs. By capturing an image of a dog's nose, the system extracts a unique "nose print" embedding using machine learning, allowing you to register and subsequently identify dogs non-invasively.
+DoGNose is a biometric identification system that acts like a fingerprint scanner for dogs. By capturing an image of a dog's nose, the system extracts a unique "nose print" embedding using a custom machine learning pipeline, allowing you to register and subsequently identify dogs non-invasively.
 
-> **Note on Project Scope and Limitations (v0.1.0 MVP)**
-> - **Liveness Detection:** Currently relies on standard camera capture frames. Advanced sharpness/variance gating is planned for v1.1.
+> **Note on Project Scope and Limitations (v1.0)**
+> - **Liveness Detection:** Currently relies on standard camera capture frames. Advanced sharpness/variance gating is planned.
 > - **Age Constraints:** Nose prints stabilize as dogs mature; the system works best for adult dogs.
-## Upgrading the Embedder
 
-To deploy a new embedder version (e.g., `v2`):
-1. Add the new `.onnx` model to the `/models` directory.
-2. Update the `backend/services/inference.py` to load the new version into `embedder_sessions`.
-3. Set the environment variable `ACTIVE_EMBEDDING_VERSION=v2`.
-4. Existing dogs enrolled with `v1` will still have their data in the database, but they will not match against new `v2` queries since they exist in different vector spaces. To make them matchable again under `v2`, they must be re-enrolled using the frontend. They do not automatically disappear, but they need the new biometric signature to be recognized by the new active model.
+## 🌟 Features
+- **Biometric Enrollment:** Capture and enroll 5 high-quality nose prints per dog to create a robust biometric profile.
+- **Fast Identification:** Search for a dog in real-time by taking a photo of their nose, utilizing highly optimized vector similarity search.
+- **Robust ML Pipeline:** Two-stage object detection (Dog -> Nose) followed by a state-of-the-art embedding network.
+- **Progressive Web App (PWA):** Works seamlessly on mobile devices with native camera integration.
 
-## Local Setup
+## 🛠 Tech Stack
+- **Frontend:** Next.js 14, React, TailwindCSS, Framer Motion, Lucide Icons.
+- **Backend:** FastAPI, Python, Uvicorn.
+- **Database:** Supabase (PostgreSQL) with `pgvector`.
+- **Machine Learning:** PyTorch, Ultralytics YOLOv8, `timm` (Hugging Face), OpenCV.
+
+## 🧠 ML Pipeline & Architecture
+
+The identification system relies on a sequence of models to isolate and embed the dog's nose print:
+
+1. **Dog Detection (COCO YOLOv8n):** The system first validates that the uploaded image actually contains a dog.
+2. **Nose Localization (Custom YOLOv8):** A custom-trained YOLOv8 model (`best.pt` -> `detector.onnx`) strictly isolates and crops the dog's nose from the frame.
+3. **Preprocessing (CLAHE):** Optional Contrast Limited Adaptive Histogram Equalization (CLAHE) and bilateral filtering to enhance the ridge texture of the nose.
+4. **Feature Extraction (MegaDescriptor):** The cropped nose is passed through `BVRA/MegaDescriptor-T-CNN-288`, an EfficientNet-based embedder fine-tuned with ArcFace loss. It outputs a 1536-dimensional L2-normalized embedding.
+5. **Vector Search:** The embedding is sent to Supabase `pgvector`, which calculates cosine similarity against the database to find the closest match above a `0.60` confidence threshold.
+
+## 🗄 Database Setup
+
+The project uses a custom schema `dognose` to isolate its tables from the default `public` schema.
+
+### Tables
+- `dognose.dogs`: Stores dog metadata (name, breed, owner details) and the `1536-dim` vector embedding.
+- `dognose.scan_logs`: Tracks successful identification matches.
+
+### Security & Permissions
+Row Level Security (RLS) is used extensively. To allow the API to function, you **must** grant usage privileges to the Supabase roles on the custom schema:
+```sql
+GRANT USAGE ON SCHEMA dognose TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA dognose TO anon, authenticated, service_role;
+```
+
+## 🚀 Local Setup
 
 ### 1. Database (Supabase)
 1. Create a new Supabase project.
-2. Run `database/01_schema.sql` to initialize the `dogs` and `nose_prints` tables (ensure the `vector` extension is enabled).
+2. Run `database/01_schema.sql` to initialize the `dognose` schema and tables (ensure the `vector` extension is enabled).
 3. Run `database/02_rls_policies.sql` to apply Row Level Security so users only see their own dogs.
+4. Execute the schema `GRANT` commands mentioned above.
 
 ### 2. Backend (FastAPI)
 Requires Python 3.9+.
 
 ```bash
+cd backend
 # Install dependencies
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
 
-# Download ONNX models (ensure models are placed in the /models directory)
-chmod +x scripts/download_models.sh
-./scripts/download_models.sh
+# Create a .env file based on the environment variables section below
 
 # Start the backend server
-uvicorn backend.main:app --reload
+uvicorn main:app --reload --port 8000
 ```
+> Ensure your custom YOLOv8 nose detector model is placed at `models/detector.onnx`.
 
 ### 3. Frontend (Next.js)
 Requires Node.js 18+.
@@ -50,32 +81,18 @@ npm run dev
 ```
 The frontend will be available at `http://localhost:3000`.
 
-## Environment Variables
-Reference `.env.example` for the required keys. You must provide:
-- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (in `frontend/.env.local` for the client, and `.env` for the backend).
-- `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8000` locally, set to your deployed backend URL in production).
+## 🔐 Environment Variables
 
-## Deployment Guide
+**Frontend (`frontend/.env.local`):**
+- `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase Project URL.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase Anon Public Key.
+- `NEXT_PUBLIC_API_URL`: Your backend URL (e.g., `http://localhost:8000`).
 
-### Deploying the Backend (Render)
-You can deploy the backend easily using Render's native Python Web Service without needing a Dockerfile.
-1. Create a new **Web Service** on Render connected to this repository.
-2. **Environment:** Python
-3. **Build Command:**
-   ```bash
-   pip install -r backend/requirements.txt && chmod +x scripts/download_models.sh && ./scripts/download_models.sh
-   ```
-4. **Start Command:**
-   ```bash
-   uvicorn backend.main:app --host 0.0.0.0 --port $PORT
-   ```
-5. Add your Supabase environment variables (`SUPABASE_URL`, `SUPABASE_ANON_KEY`) in the Render dashboard.
-6. **Crucial:** Add `ALLOWED_ORIGINS` in the Render dashboard environment variables and set it to your exact frontend URL (e.g. `https://dog-nose.vercel.app`), without a trailing slash, to fix CORS errors.
-
-### Deploying the Frontend (Vercel)
-1. Import the `frontend/` directory as a new project on Vercel.
-2. Add your `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_API_URL` (pointing to your Render URL) to the Vercel environment variables.
-3. Deploy!
-
-## Live Demo
-*Update this section with your live frontend URL once deployed.*
+**Backend (`backend/.env`):**
+- `SUPABASE_URL`: Your Supabase Project URL.
+- `SUPABASE_ANON_KEY`: Your Supabase Anon Public Key.
+- `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase Service Role Key (for bypassing RLS in certain background jobs).
+- `NOSE_MODEL_PATH`: Absolute path to your nose detector model (e.g., `Z:\Santu\IntelliJ\DoGNose\models\detector.onnx`).
+- `MATCH_THRESHOLD`: Cosine similarity threshold (Default: `0.60`).
+- `DB_SCHEMA`: The Postgres schema used (Default: `dognose`).
+- `ENABLE_CLAHE`: Enable/disable CLAHE preprocessing (Default: `false`).
