@@ -1,10 +1,10 @@
-import os
 import logging
-from fastapi import HTTPException, Security, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from supabase import create_client, Client, ClientOptions
+import os
+
 import jwt
-from jwt.exceptions import PyJWTError
+from fastapi import HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from supabase import Client, ClientOptions, create_client
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -
             raise HTTPException(status_code=401, detail={"code": "UNAUTHORIZED", "message": "Invalid token: missing user ID"})
         return user_id
     except Exception as e:
-        logger.error(f"JWT verification failed with exception: {str(e)}", exc_info=True)
+        logger.error(f"JWT verification failed with exception: {e!s}", exc_info=True)
         raise HTTPException(status_code=401, detail={"code": "UNAUTHORIZED", "message": "Invalid or expired token"})
 
 def get_current_user_id(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:

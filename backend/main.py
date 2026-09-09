@@ -1,14 +1,15 @@
-import os
 import logging
+import os
 from contextlib import asynccontextmanager
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from dotenv import load_dotenv
+from slowapi.util import get_remote_address
 
 load_dotenv()
 
@@ -63,6 +64,8 @@ app.add_middleware(
 )
 
 import time
+
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
@@ -106,7 +109,7 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 
 # Import and include routers
-from routers import dogs, stats, validate, report  # noqa: E402
+from routers import dogs, report, stats, validate
 
 os.makedirs("static/uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")

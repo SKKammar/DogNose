@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Request, HTTPException
-from pydantic import BaseModel
-from typing import Optional
 import logging
+
+from dependencies import get_service_supabase
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from dependencies import get_service_supabase
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 class ReportRequest(BaseModel):
     dog_id: str
-    note: Optional[str] = None
+    note: str | None = None
 
 class ReportResponse(BaseModel):
     success: bool

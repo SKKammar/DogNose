@@ -156,7 +156,7 @@ export default function DashboardPage() {
                   <PawPrint className="w-8 h-8 text-[var(--color-muted)] opacity-50" />
                 </div>
                 <h3 className="text-lg font-semibold text-[var(--color-text)] mb-2">No dogs registered yet</h3>
-                <p className="text-[var(--color-muted)] text-sm mb-6 max-w-sm">Secure your dog's identity by enrolling their unique nose print into the Canid registry.</p>
+                <p className="text-[var(--color-muted)] text-sm mb-6 max-w-sm">Secure your dog&apos;s identity by enrolling their unique nose print into the Canid registry.</p>
                 <Link href="/enroll" className="text-[var(--color-accent)] hover:text-white font-medium transition-colors">
                   Get started →
                 </Link>

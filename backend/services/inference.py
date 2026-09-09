@@ -8,17 +8,18 @@ Output: 1536-dimensional L2-normalized embedding.
 Nose Detector: Custom YOLOv8n (best.pt) for nose localization.
 """
 import os
+
 os.environ["HF_HOME"] = os.path.join(os.path.dirname(__file__), ".hf_cache")
+import logging
+
 import cv2
 import numpy as np
+import timm
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
 from PIL import Image
-import timm
 from ultralytics import YOLO
-import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ NOSE_MODEL_PATH = os.getenv("NOSE_MODEL_PATH", "../best.pt")
 # Module-level model holders (initialized by init_models)
 _embedder_model = None
 _embedder_transforms = None
-_nose_detector: Optional[YOLO] = None
+_nose_detector: YOLO | None = None
 
 
 def _load_embedder():
@@ -41,7 +42,20 @@ def _load_embedder():
     global _embedder_model, _embedder_transforms
     if _embedder_model is None:
         logger.info(f"Loading embedder model: {MODEL_HF_ID} ...")
-        _embedder_model = timm.create_model(MODEL_HF_ID, num_classes=0, pretrained=True)
+        
+        # PyTorch 2.6+ defaults weights_only=True, blocking legacy numpy objects in checkpoint
+        orig_load = torch.load
+        def _compat_load(*args, **kwargs):
+            if "weights_only" in kwargs:
+                kwargs["weights_only"] = False
+            return orig_load(*args, **kwargs)
+
+        try:
+            torch.load = _compat_load
+            _embedder_model = timm.create_model(MODEL_HF_ID, num_classes=0, pretrained=True)
+        finally:
+            torch.load = orig_load
+
         _embedder_model.eval()
         _embedder_transforms = T.Compose([
             T.Resize((INPUT_SIZE, INPUT_SIZE)),
@@ -72,8 +86,9 @@ def init_models():
     Initialize all ML models. Called once during app startup (lifespan).
     Pre-loads: COCO dog detector, custom nose detector, and MegaDescriptor embedder.
     """
-    from services.validator import _get_coco_model
     import time
+
+    from services.validator import _get_coco_model
 
     logger.info("Starting model initialization...")
     

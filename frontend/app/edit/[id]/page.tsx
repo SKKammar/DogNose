@@ -105,7 +105,7 @@ export default function EditDogPage({ params }: { params: Promise<{ id: string }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center w-full bg-[var(--color-bg)] p-4 text-center">
         <h2 className="text-xl font-bold text-[var(--color-error)] mb-2">Error loading profile</h2>
-        <p className="text-[var(--color-muted)] mb-6">We couldn't load the details for this dog.</p>
+        <p className="text-[var(--color-muted)] mb-6">We couldn&apos;t load the details for this dog.</p>
         <Link href="/dashboard" className="px-6 py-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)]">
           Back to Dashboard
         </Link>
@@ -133,7 +133,7 @@ export default function EditDogPage({ params }: { params: Promise<{ id: string }
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-sm font-medium text-[var(--color-text)]">Dog's Name *</label>
+                <label className="text-sm font-medium text-[var(--color-text)]">Dog&apos;s Name *</label>
                 <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-colors" placeholder="e.g. Max" />
               </div>
               <div className="space-y-1">

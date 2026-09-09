@@ -1,8 +1,8 @@
-from fastapi import APIRouter
-from dependencies import get_service_supabase
-from typing import Dict
 import logging
-from cachetools import cached, TTLCache
+
+from cachetools import TTLCache, cached
+from dependencies import get_service_supabase
+from fastapi import APIRouter
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 # Cache for 60 seconds
 cache = TTLCache(maxsize=1, ttl=60)
 
-@router.get("", response_model=Dict[str, int])
+@router.get("", response_model=dict[str, int])
 @cached(cache)
 def get_stats():
     """

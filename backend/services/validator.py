@@ -3,11 +3,12 @@ Two-stage image validation for DogNose.
 Stage 1: detect dog presence (COCO yolov8n).
 Stage 2: detect nose (custom best.pt).
 """
+import logging
+
 import cv2
 import numpy as np
-from ultralytics import YOLO
 from fastapi import UploadFile
-import logging
+from ultralytics import YOLO
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ def validate_nose_visible(nose_model: YOLO, image_bgr: np.ndarray) -> np.ndarray
         )
 
     # Pick highest-confidence detection
-    best_conf, best_box = max(all_boxes, key=lambda x: x[0])
+    _, best_box = max(all_boxes, key=lambda x: x[0])
     x1, y1, x2, y2 = map(int, best_box)
 
     # Clamp to image bounds
@@ -165,13 +166,13 @@ def run_full_validation(nose_model: YOLO, image_bgr: np.ndarray) -> np.ndarray:
     return nose_crop
 
 
-async def read_upload_as_array(upload: UploadFile) -> np.ndarray:
+def read_upload_as_array(upload: UploadFile) -> np.ndarray:
     """
     Reads an uploaded file into a BGR numpy array.
     Does NOT write to disk — works entirely in memory.
     Raises ValueError if the bytes cannot be decoded as an image.
     """
-    contents = await upload.read()
+    contents = upload.file.read()
     if not contents:
         raise ValueError("Uploaded file is empty.")
 
@@ -185,5 +186,5 @@ async def read_upload_as_array(upload: UploadFile) -> np.ndarray:
         )
 
     # Reset the upload stream position for any retry logic
-    await upload.seek(0)
+    upload.file.seek(0)
     return image

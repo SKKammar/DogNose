@@ -1,5 +1,5 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+export const API_URL = BASE_URL + '/api'
 export type ApiErrorType = 'network' | 'cors' | 'timeout' | 'server' | 'validation'
 
 export interface ApiError {
@@ -208,7 +208,7 @@ export async function callWithWakeUp<T>(
       // Poll health endpoint every 3 seconds
       while (true) {
         try {
-          const res = await fetch(`${API_URL}/health`, { cache: 'no-store' })
+          const res = await fetch(`${BASE_URL}/health`, { cache: 'no-store' })
           if (res.ok) {
             const data = await res.json()
             if (data.models_ready) break

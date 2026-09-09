@@ -1,11 +1,11 @@
-import pytest
 import io
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
-from backend.main import app
 from backend.dependencies import get_supabase
+from backend.main import app
 
 client = TestClient(app)
 
@@ -21,7 +21,8 @@ def override_security():
     mock.credentials = "fake-token"
     return mock
 
-from backend.dependencies import get_supabase, security
+from backend.dependencies import security
+
 app.dependency_overrides[get_supabase] = override_get_supabase
 app.dependency_overrides[security] = override_security
 

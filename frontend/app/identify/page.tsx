@@ -57,7 +57,7 @@ const ERROR_MESSAGES: Record<string, { icon: string; title: string; hint: string
   NO_NOSE: {
     icon: "👃",
     title: "Nose not visible",
-    hint: "Point the camera directly at your dog's nose from about 15–20 cm away."
+    hint: "Point the camera directly at your dog&apos;s nose from about 15–20 cm away."
   },
   NOSE_TOO_SMALL: {
     icon: "🔍",
@@ -67,7 +67,7 @@ const ERROR_MESSAGES: Record<string, { icon: string; title: string; hint: string
   NO_MATCH: {
     icon: "❓",
     title: "Dog not recognized",
-    hint: "This dog isn't enrolled yet. Use the Enroll option to register them first."
+    hint: "This dog isn&apos;t enrolled yet. Use the Enroll option to register them first."
   },
   BAD_INPUT: {
     icon: "⚠️",
@@ -235,7 +235,7 @@ export default function IdentifyPage() {
           >
             <div className="flex flex-col items-center mb-6 shrink-0">
               <Camera className="w-10 h-10 text-[var(--color-accent)] mb-2" />
-              <h2 className="text-xl font-bold font-display text-[var(--color-text)]">Point at any dog's nose</h2>
+              <h2 className="text-xl font-bold font-display text-[var(--color-text)]">Point at any dog&apos;s nose</h2>
             </div>
             
             <div className="flex-1 min-h-0 w-full relative">
@@ -345,7 +345,7 @@ export default function IdentifyPage() {
               <span className="text-4xl">❓</span>
             </div>
             <h2 className="text-3xl font-bold font-display text-[var(--color-text)] mb-3">Dog not recognized</h2>
-            <p className="text-[var(--color-muted)] mb-10 text-center">This dog isn't enrolled yet. Register them first to enable identification.</p>
+            <p className="text-[var(--color-muted)] mb-10 text-center">This dog isn&apos;t enrolled yet. Register them first to enable identification.</p>
             
             <div className="w-full flex flex-col sm:flex-row gap-4">
               <Link href="/enroll" className="flex-1 py-4 bg-[var(--color-accent)] text-white text-center rounded-xl font-semibold hover:bg-blue-600 transition shadow-[0_0_15px_rgba(79,156,249,0.2)]">

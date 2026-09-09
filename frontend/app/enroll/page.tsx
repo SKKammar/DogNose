@@ -183,7 +183,7 @@ export default function EnrollPage() {
               <h2 className="text-xl font-semibold text-[var(--color-text)] mb-6">Dog Information</h2>
               <div className="space-y-5">
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider mb-2">Dog's Name *</label>
+                  <label className="block text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider mb-2">Dog&apos;s Name *</label>
                   <input 
                     type="text" 
                     required 
@@ -339,7 +339,7 @@ export default function EnrollPage() {
             <p className="text-center text-[var(--color-muted)] mb-6 text-sm">
               {retakeIndex !== null 
                 ? `Capture a replacement for photo ${retakeIndex + 1}`
-                : "Capture 1 or more clear photos of the dog's nose."
+                : "Capture 1 or more clear photos of the dog&apos;s nose."
               }
             </p>
             
@@ -420,7 +420,7 @@ export default function EnrollPage() {
               <CheckCircle2 className="text-[var(--color-success)] w-12 h-12" />
             </div>
             <h2 className="text-3xl font-bold font-display text-[var(--color-text)] mb-2">Success!</h2>
-            <p className="text-[var(--color-muted)] mb-10 text-sm">{enrolledDogName}'s biometric signature has been securely stored in the registry.</p>
+            <p className="text-[var(--color-muted)] mb-10 text-sm">{enrolledDogName}&apos;s biometric signature has been securely stored in the registry.</p>
             <div className="w-full space-y-3">
               <button
                 onClick={() => {

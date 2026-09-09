@@ -34,7 +34,7 @@ export default function HomePage() {
           <span className="text-[var(--color-accent)]">One Identity.</span>
         </h1>
         <p className="text-lg md:text-xl text-[var(--color-muted)] mb-4 max-w-2xl font-light">
-          A biometric registry for dogs. Just like a human fingerprint, every dog's nose pattern is completely unique. Find lost pets in seconds.
+          A biometric registry for dogs. Just like a human fingerprint, every dog&apos;s nose pattern is completely unique. Find lost pets in seconds.
         </p>
         <div className="mb-12">
           <span className="inline-block px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 rounded-full text-xs font-semibold uppercase tracking-wider">
@@ -98,7 +98,7 @@ export default function HomePage() {
                 <Camera className="w-7 h-7 text-[var(--color-accent)]" />
               </div>
               <h3 className="text-xl font-semibold mb-2">1. Snap</h3>
-              <p className="text-[var(--color-muted)]">Take a photo of any dog's nose</p>
+              <p className="text-[var(--color-muted)]">Take a photo of any dog&apos;s nose</p>
             </motion.div>
             
             <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="flex flex-col items-center text-center relative z-10 group cursor-default">

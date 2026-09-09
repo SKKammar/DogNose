@@ -1,24 +1,22 @@
-import os
 import logging
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
+import os
+
+import numpy as np
+from dependencies import (
+    get_current_user_id,
+    get_service_supabase,
+)
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional
-
-from dependencies import (
-    get_service_supabase,
-    get_current_user_id,
-)
 from services.inference import get_embedding, get_nose_detector
 from services.validator import (
-    run_full_validation,
     ImageValidationError,
     read_upload_as_array,
+    run_full_validation,
 )
-
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -40,66 +38,66 @@ IDENTIFY_RATE_LIMIT = os.getenv("IDENTIFY_RATE_LIMIT", "10/minute")
 
 class DogCreate(BaseModel):
     name: str
-    breed: Optional[str] = None
-    age: Optional[float] = None
-    sex: Optional[str] = None
-    color_markings: Optional[str] = None
-    owner_name: Optional[str] = None
-    owner_phone: Optional[str] = None
-    owner_email: Optional[str] = None
-    microchip_id: Optional[str] = None
-    notes: Optional[str] = None
-    profile_photo_url: Optional[str] = None
+    breed: str | None = None
+    age: float | None = None
+    sex: str | None = None
+    color_markings: str | None = None
+    owner_name: str | None = None
+    owner_phone: str | None = None
+    owner_email: str | None = None
+    microchip_id: str | None = None
+    notes: str | None = None
+    profile_photo_url: str | None = None
 
 
 class DogUpdate(BaseModel):
-    name: Optional[str] = None
-    breed: Optional[str] = None
-    age: Optional[float] = None
-    sex: Optional[str] = None
-    color_markings: Optional[str] = None
-    owner_name: Optional[str] = None
-    owner_phone: Optional[str] = None
-    owner_email: Optional[str] = None
-    microchip_id: Optional[str] = None
-    notes: Optional[str] = None
-    profile_photo_url: Optional[str] = None
+    name: str | None = None
+    breed: str | None = None
+    age: float | None = None
+    sex: str | None = None
+    color_markings: str | None = None
+    owner_name: str | None = None
+    owner_phone: str | None = None
+    owner_email: str | None = None
+    microchip_id: str | None = None
+    notes: str | None = None
+    profile_photo_url: str | None = None
 
 
 class DogResponse(BaseModel):
     id: str
     name: str
-    breed: Optional[str] = None
-    age: Optional[float] = None
-    sex: Optional[str] = None
-    color_markings: Optional[str] = None
-    owner_name: Optional[str] = None
-    owner_phone: Optional[str] = None
-    owner_email: Optional[str] = None
-    microchip_id: Optional[str] = None
-    notes: Optional[str] = None
-    profile_photo_url: Optional[str] = None
+    breed: str | None = None
+    age: float | None = None
+    sex: str | None = None
+    color_markings: str | None = None
+    owner_name: str | None = None
+    owner_phone: str | None = None
+    owner_email: str | None = None
+    microchip_id: str | None = None
+    notes: str | None = None
+    profile_photo_url: str | None = None
 
 
 class DogListItem(BaseModel):
     id: str
     name: str
-    breed: Optional[str] = None
+    breed: str | None = None
     nose_print_count: int = 0
-    profile_photo_url: Optional[str] = None
+    profile_photo_url: str | None = None
 
 
 class MatchCandidate(BaseModel):
     dog_id: str
     name: str
-    breed: Optional[str] = None
-    age: Optional[float] = None
-    sex: Optional[str] = None
-    color_markings: Optional[str] = None
-    owner_name: Optional[str] = None
-    owner_phone: Optional[str] = None
-    owner_email: Optional[str] = None
-    profile_photo_url: Optional[str] = None
+    breed: str | None = None
+    age: float | None = None
+    sex: str | None = None
+    color_markings: str | None = None
+    owner_name: str | None = None
+    owner_phone: str | None = None
+    owner_email: str | None = None
+    profile_photo_url: str | None = None
     similarity: float
     is_match: bool
 
@@ -107,13 +105,13 @@ class MatchCandidate(BaseModel):
 class IdentifyResponse(BaseModel):
     match: bool
     message: str
-    confidence: Optional[float] = None
-    dog: Optional[MatchCandidate] = None
+    confidence: float | None = None
+    dog: MatchCandidate | None = None
 
 
 # --- Image validation helper ---
 
-async def validate_upload_metadata(request: Request, file: UploadFile) -> None:
+def validate_upload_metadata(request: Request, file: UploadFile) -> None:
     """Validate uploaded file metadata: check type and size only."""
     if file.content_type not in ALLOWED_UPLOAD_TYPES:
         raise HTTPException(
@@ -177,7 +175,7 @@ def register_dog(
     )
 
 
-@router.get("", response_model=List[DogListItem])
+@router.get("", response_model=list[DogListItem])
 def list_dogs(
     user_id: str = Depends(get_current_user_id),
 ):
@@ -210,10 +208,10 @@ def list_dogs(
 
 @router.post("/{dog_id}/enroll")
 @limiter.limit("10/minute")
-async def enroll_dog(
+def enroll_dog(
     request: Request,
     dog_id: str,
-    nose_images: List[UploadFile] = File(...),
+    nose_images: list[UploadFile] = File(...),
     user_id: str = Depends(get_current_user_id),
 ):
     """
@@ -242,10 +240,10 @@ async def enroll_dog(
     for i, nose_image in enumerate(nose_images):
         try:
             # Validate file metadata
-            await validate_upload_metadata(request, nose_image)
+            validate_upload_metadata(request, nose_image)
 
             # Read into memory as BGR array
-            image_bgr = await read_upload_as_array(nose_image)
+            image_bgr = read_upload_as_array(nose_image)
 
             # Run full validation pipeline (quality + dog + nose)
             nose_crop = run_full_validation(nose_model, image_bgr)
@@ -256,8 +254,9 @@ async def enroll_dog(
 
             # Save the first valid photo as the profile photo
             if profile_photo_url is None:
-                import cv2
                 import os
+
+                import cv2
                 upload_dir = "static/uploads"
                 os.makedirs(upload_dir, exist_ok=True)
                 file_path = os.path.join(upload_dir, f"{dog_id}.jpg")
@@ -402,9 +401,9 @@ def get_scan_logs(user_id: str = Depends(get_current_user_id)):
     ]
 
 
-@router.post("/identify")
+@router.post("/identify", response_model=IdentifyResponse)
 @limiter.limit(IDENTIFY_RATE_LIMIT)
-async def identify_dog(
+def identify_dog(
     request: Request,
     nose_image: UploadFile = File(...),
 ):
@@ -413,10 +412,10 @@ async def identify_dog(
     Runs full validation pipeline, then queries pgvector for top-3 matches.
     """
     # Validate file metadata (type + size)
-    await validate_upload_metadata(request, nose_image)
+    validate_upload_metadata(request, nose_image)
 
     # Read into memory as BGR array
-    image_bgr = await read_upload_as_array(nose_image)
+    image_bgr = read_upload_as_array(nose_image)
 
     # Run full validation pipeline (quality → dog detection → nose detection)
     # ImageValidationError is caught by the global exception handler in main.py
