@@ -8,12 +8,10 @@ from services.validator import (
     read_upload_as_array,
     run_full_validation,
 )
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from main import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/validate-nose", tags=["validate"])
-limiter = Limiter(key_func=get_remote_address)
 
 class ValidateResponse(BaseModel):
     valid: bool

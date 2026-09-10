@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Camera, ScanFace, CheckCircle, Smartphone, ShieldCheck } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { API_URL } from '../lib/api'
 
 interface Stats {
   registered_dogs: number;
@@ -14,7 +15,7 @@ export default function HomePage() {
   const [stats, setStats] = useState<Stats>({ registered_dogs: 0, matches_made: 0, owners_reunited: 0 })
 
   useEffect(() => {
-    fetch('/api/stats')
+    fetch(`${API_URL}/stats`)
       .then(res => res.json())
       .then(data => setStats(data))
       .catch(err => console.error(err))

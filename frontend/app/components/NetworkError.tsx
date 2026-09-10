@@ -53,7 +53,7 @@ export default function NetworkError({ error, onRetry }: NetworkErrorProps) {
               <span className="w-5 h-5 shrink-0 flex items-center justify-center bg-zinc-800 rounded-full text-xs font-bold text-zinc-300">1</span>
               <div>
                 <strong className="text-zinc-200 block mb-1">Verify API URL</strong>
-                <p>Ensure <code className="bg-zinc-800 px-1 py-0.5 rounded text-zinc-300">NEXT_PUBLIC_API_URL</code> in Vercel is correct.</p>
+                <p>Ensure <code className="bg-zinc-800 px-1 py-0.5 rounded text-zinc-300">NEXT_PUBLIC_API_URL</code> is correct.</p>
                 <div className="mt-2 p-2 bg-zinc-900 rounded-lg text-xs font-mono break-all text-blue-400 border border-zinc-800">
                   Current: {process.env.NEXT_PUBLIC_API_URL || 'Not Set (using defaults)'}
                 </div>
@@ -64,17 +64,17 @@ export default function NetworkError({ error, onRetry }: NetworkErrorProps) {
               <span className="w-5 h-5 shrink-0 flex items-center justify-center bg-zinc-800 rounded-full text-xs font-bold text-zinc-300">2</span>
               <div>
                 <strong className="text-zinc-200 block mb-1">Check CORS Configurations</strong>
-                <p>On Render, verify the <code className="bg-zinc-800 px-1 py-0.5 rounded text-zinc-300">ALLOWED_ORIGINS</code> environment variable matches the current Vercel URL exactly.</p>
+                <p>Verify that your backend allows requests from this domain.</p>
               </div>
             </li>
 
             <li className="flex gap-3">
               <span className="w-5 h-5 shrink-0 flex items-center justify-center bg-zinc-800 rounded-full text-xs font-bold text-zinc-300">3</span>
               <div>
-                <strong className="text-zinc-200 block mb-1">Backend Cold Start</strong>
+                <strong className="text-zinc-200 block mb-1">Server Status</strong>
                 <p className="flex items-start gap-2">
                   <Clock size={14} className="text-orange-400 mt-0.5 shrink-0" />
-                  Render free tiers spin down after inactivity. Wait 60 seconds and retry while the server wakes up.
+                  Ensure your backend server is running and accessible.
                 </p>
               </div>
             </li>

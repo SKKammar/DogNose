@@ -15,13 +15,11 @@ from services.validator import (
     read_upload_as_array,
     run_full_validation,
 )
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from main import limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dogs", tags=["dogs"])
-limiter = Limiter(key_func=get_remote_address)
 
 # Configuration from environment
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
@@ -317,6 +315,40 @@ def enroll_dog(
     }
 
 
+@router.get("/user/scan-logs")
+def get_scan_logs(user_id: str = Depends(get_current_user_id)):
+    """Return scan events for the authenticated user's dogs."""
+    supabase = get_service_supabase()
+    dogs_res = supabase.table("dogs").select("id, name").eq("owner", user_id).execute()
+    if not dogs_res.data:
+        return []
+    dog_ids = [d["id"] for d in dogs_res.data]
+    dog_names = {d["id"]: d["name"] for d in dogs_res.data}
+    if not dog_ids:
+        return []
+    logs_res = (
+        supabase.table("scan_logs")
+        .select("*")
+        .in_("matched_dog_id", dog_ids)
+        .order("scanned_at", desc=True)
+        .limit(50)
+        .execute()
+    )
+    if not logs_res.data:
+        return []
+    return [
+        {
+            "id": l["id"],
+            "dog_name": dog_names.get(l["matched_dog_id"], "Unknown"),
+            "match_confidence": l.get("similarity_score"),
+            "scanned_at": l["scanned_at"],
+            "location_lat": l.get("location_lat"),
+            "location_lon": l.get("location_lon"),
+        }
+        for l in logs_res.data
+    ]
+
+
 @router.get("/{dog_id}", response_model=DogResponse)
 def get_dog(dog_id: str, user_id: str = Depends(get_current_user_id)):
     """Get full dog profile."""
@@ -357,7 +389,7 @@ def update_dog(
         raise HTTPException(status_code=403, detail={"code": "UNAUTHORIZED", "message": "You do not have permission to access this resource."})
     
     # Filter out None values to only update provided fields
-    update_data = {k: v for k, v in dog.dict().items() if v is not None}
+    update_data = {k: v for k, v in dog.model_dump().items() if v is not None}
     
     if not update_data:
         return get_dog(dog_id, user_id)
@@ -368,37 +400,6 @@ def update_dog(
         
     row = res.data[0]
     return DogResponse(**row)
-
-
-@router.get("/user/scan-logs")
-def get_scan_logs(user_id: str = Depends(get_current_user_id)):
-    """Return scan events for the authenticated user's dogs."""
-    supabase = get_service_supabase()
-    dogs_res = supabase.table("dogs").select("id, name").eq("owner", user_id).execute()
-    if not dogs_res.data:
-        return []
-    dog_ids = [d["id"] for d in dogs_res.data]
-    dog_names = {d["id"]: d["name"] for d in dogs_res.data}
-    if not dog_ids:
-        return []
-    logs_res = (
-        supabase.table("scan_logs")
-        .select("*")
-        .in_("matched_dog_id", dog_ids)
-        .order("scanned_at", desc=True)
-        .limit(50)
-        .execute()
-    )
-    if not logs_res.data:
-        return []
-    return [
-        {
-            "dog_name": dog_names.get(l["matched_dog_id"], "Unknown"),
-            "similarity_score": l["similarity_score"],
-            "scanned_at": l["scanned_at"],
-        }
-        for l in logs_res.data
-    ]
 
 
 @router.post("/identify", response_model=IdentifyResponse)

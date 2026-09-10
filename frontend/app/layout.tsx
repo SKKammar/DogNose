@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   title: 'CANID',
   description: 'CANID — biometric dog identification by nose print.',
   manifest: '/manifest.json',
+}
+
+export const viewport = {
   themeColor: '#0A0E14',
 }
 
@@ -22,9 +25,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <head>
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-      </head>
       <body className={`${inter.variable} ${syne.variable} ${jetbrains.variable}`}>
         <Navbar />
         <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] flex flex-col items-center">

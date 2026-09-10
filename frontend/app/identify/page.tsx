@@ -4,7 +4,7 @@ import CameraCapture from '../components/CameraCapture'
 import { Loader2, Fingerprint, ChevronLeft, Camera, Phone, Mail, Copy, AlertTriangle, PawPrint } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { identifyNose, callWithWakeUp, ApiError } from '../../lib/api'
+import { identifyNose, callWithWakeUp, ApiError, API_URL } from '../../lib/api'
 import NetworkError from '../components/NetworkError'
 import { toast } from 'sonner'
 
@@ -103,7 +103,7 @@ export default function IdentifyPage() {
   const stepTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    fetch('/api/stats')
+    fetch(`${API_URL}/stats`)
       .then(res => res.json())
       .then(data => setStats(data))
       .catch(() => {})
@@ -191,7 +191,7 @@ export default function IdentifyPage() {
   const submitReport = async () => {
     if (!result?.dog?.dog_id) return
     try {
-      await fetch('/api/report', {
+      await fetch(`${API_URL}/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dog_id: result.dog.dog_id, note: reportNote })

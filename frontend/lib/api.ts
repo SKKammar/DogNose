@@ -11,7 +11,7 @@ export interface ApiError {
 
 /**
  * Fetch wrapper with error handling, timeout, and typed error responses.
- * Timeout set to 60s to accommodate Render free-tier cold starts.
+ * Timeout set to 60s to accommodate cold starts.
  *
  * For 422 validation errors, this now returns the response (not throws)
  * so callers can read the structured error body.
@@ -61,7 +61,7 @@ export async function fetchWithErrorHandling(url: string, options: RequestInit =
     }
 
     if (error.name === 'AbortError') {
-      throw { type: 'timeout', message: 'The request timed out. The server might be experiencing a cold-start on Render or there is a network issue.' }
+      throw { type: 'timeout', message: 'The request timed out. The server might be experiencing a cold-start or there is a network issue.' }
     }
 
     if (error.name === 'TypeError' || error.message === 'Failed to fetch') {

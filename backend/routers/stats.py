@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
-# Cache for 60 seconds
+# Cache for 60 seconds (in-memory only — not shared across uvicorn workers).
+# If running with --workers > 1 in future, replace with Redis or Supabase-backed caching.
 cache = TTLCache(maxsize=1, ttl=60)
 
 @router.get("", response_model=dict[str, int])
