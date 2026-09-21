@@ -11,7 +11,7 @@ Browser (Next.js Frontend)
                                   │
                                   ├──▶ Detector Model (ONNX - YOLOv8)
                                   │
-                                  └──▶ Embedder Model (ONNX)
+                                  └──▶ Embedder Model (PyTorch - Fine-tuned MegaDescriptor)
 ```
 
 ## Frontend Architecture
@@ -23,11 +23,11 @@ Browser (Next.js Frontend)
 ## Backend Architecture
 - **Framework:** FastAPI
 - **Rate Limiting:** SlowAPI (limit by IP)
-- **ML Engine:** ONNXRuntime with OpenCV for image preprocessing
+- **ML Engine:** ONNXRuntime for Object Detection (YOLO), PyTorch (`timm`) for Feature Extraction (MegaDescriptor).
 - **Authentication:** HTTPBearer token verification via Supabase client
 
 ## Database Architecture
 - **Engine:** PostgreSQL (hosted on Supabase)
 - **Extensions:** pgvector (for vector similarity search)
-- **Tables:** `dogs`, `nose_prints`
+- **Tables:** `dogs`, `scan_logs`
 - **Security:** Row Level Security (RLS) applied to ensure data privacy per user

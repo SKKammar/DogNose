@@ -4,10 +4,16 @@
 
 | Method | Route | Purpose | Used By | Auth Required |
 |---|---|---|---|---|
-| `GET` | `/health` | Health check and ML model readiness status | Monitoring | No |
-| `POST`| `/dogs` | Register a new dog profile | Frontend (`/enroll`) | Yes (Supabase JWT) |
-| `GET` | `/dogs` | List all dogs owned by the authenticated user | Frontend | Yes (Supabase JWT) |
-| `POST`| `/dogs/{dog_id}/enroll` | Process image, extract nose embedding, and save to DB | Frontend (`/enroll`) | Yes (Supabase JWT) |
-| `POST`| `/dogs/identify` | Process image, extract nose embedding, and find matching dog | Frontend (`/identify`) | Yes (Supabase JWT) |
+| `GET` | `/api/health` | Health check and ML model readiness status | Monitoring | No |
+| `GET` | `/api/stats` | Retrieve global registry stats | Frontend | No |
+| `POST`| `/api/dogs` | Register a new dog profile | Frontend (`/enroll`) | Yes (Supabase JWT) |
+| `GET` | `/api/dogs` | List all dogs owned by the authenticated user | Frontend | Yes (Supabase JWT) |
+| `GET` | `/api/dogs/{dog_id}` | Get full profile of a specific dog | Frontend | Yes (Supabase JWT) |
+| `PUT` | `/api/dogs/{dog_id}` | Update dog profile | Frontend | Yes (Supabase JWT) |
+| `DELETE`| `/api/dogs/{dog_id}`| Delete a dog profile | Frontend | Yes (Supabase JWT) |
+| `POST`| `/api/dogs/{dog_id}/enroll` | Process image, extract nose embedding, and save to DB | Frontend (`/enroll`) | Yes (Supabase JWT) |
+| `POST`| `/api/dogs/identify` | Process image, extract nose embedding, and find matching dog | Frontend (`/identify`) | No |
+| `POST`| `/api/validate-nose` | Validate if an image contains a readable dog nose | Frontend | No |
+| `GET` | `/api/user/scan-logs` | Get the user's historical scan activity | Frontend | Yes (Supabase JWT) |
 
-*Note: All `/dogs/*` routes require a valid Supabase JWT token passed via the Authorization header.*
+*Note: The `/api/dogs/identify` and `/api/validate-nose` endpoints are public and do not require authentication to facilitate rapid real-time scanning.*
