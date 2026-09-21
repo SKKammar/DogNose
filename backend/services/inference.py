@@ -56,11 +56,18 @@ def _load_embedder():
 
         try:
             torch.load = _compat_load
-            _embedder_model = timm.create_model(MODEL_HF_ID, num_classes=0, pretrained=True)
+            use_finetuned = os.getenv("USE_FINETUNED", "true").lower() == "true"
+            if use_finetuned:
+                from embedder import NoseEmbedder
+                model_path = os.getenv("EMBEDDER_MODEL_PATH", r"Z:\Santu\IntelliJ\DoGNose\models\dognose_megadescriptor_finetuned.pth")
+                _embedder_model = NoseEmbedder(model_path)
+            else:
+                _embedder_model = timm.create_model(MODEL_HF_ID, num_classes=0, pretrained=True)
+                _embedder_model.eval()
         finally:
             torch.load = orig_load
 
-        _embedder_model.eval()
+
         _embedder_transforms = T.Compose([
             T.Resize((INPUT_SIZE, INPUT_SIZE)),
             T.ToTensor(),
@@ -170,11 +177,8 @@ def get_embedding(nose_crop_bgr: np.ndarray) -> np.ndarray:
     if _embedder_model is None or _embedder_transforms is None:
         raise RuntimeError("Embedder model not loaded. Call init_models() first.")
 
-    # Enhance nose texture if enabled
-    if os.getenv("ENABLE_CLAHE", "false").lower() == "true":
-        processed = _preprocess_nose(nose_crop_bgr)
-    else:
-        processed = nose_crop_bgr
+    # We DO NOT use CLAHE here, as the fine-tuned model expects the raw crop distribution
+    processed = nose_crop_bgr
 
     # BGR → RGB → PIL
     rgb = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
@@ -185,7 +189,11 @@ def get_embedding(nose_crop_bgr: np.ndarray) -> np.ndarray:
 
     # Inference (no gradient, stateless)
     with torch.no_grad():
-        embedding = _embedder_model(tensor)                       # (1, 1536)
-        embedding = F.normalize(embedding, p=2, dim=1)            # L2 normalize
+        if hasattr(_embedder_model, 'embed'):
+            # The custom NoseEmbedder handles normalization inside its forward pass / embed method
+            embedding = _embedder_model.embed(tensor)
+        else:
+            embedding = _embedder_model(tensor)                       # (1, 1536)
+            embedding = F.normalize(embedding, p=2, dim=1)            # L2 normalize
 
     return embedding.squeeze(0).cpu().numpy().astype(np.float32)  # (1536,)

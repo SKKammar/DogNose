@@ -17,6 +17,7 @@ models/
 datasets/
 runs/
 *.pt
+*.pth
 *.onnx
 
 # Node / Next.js
@@ -33,5 +34,7 @@ out/
 
 # Data
 dataset/
+dataset_cropped/
 
 .hf_cache/
+backend/static/uploads/

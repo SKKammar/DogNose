@@ -27,8 +27,9 @@ MAX_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 ALLOWED_UPLOAD_TYPES = os.getenv(
     "ALLOWED_UPLOAD_TYPES", "image/jpeg,image/png,image/webp"
 ).split(",")
-MATCH_THRESHOLD = float(os.getenv("MATCH_THRESHOLD", "0.60"))
-ACTIVE_EMBEDDING_VERSION = "megadescriptor-v1"
+MATCH_THRESHOLD = float(os.getenv("MATCH_THRESHOLD", "0.56"))
+MATCH_MARGIN = float(os.getenv("MATCH_MARGIN", "0.08"))
+ACTIVE_EMBEDDING_VERSION = "dognose-v2-finetuned"
 IDENTIFY_RATE_LIMIT = os.getenv("IDENTIFY_RATE_LIMIT", "10/minute")
 
 
@@ -184,7 +185,7 @@ def list_dogs(
 
     dogs_res = (
         supabase.table("dogs")
-        .select("id, name, breed, embedding, profile_photo_url")
+        .select("id, name, breed, nose_embedding, profile_photo_url")
         .eq("owner", user_id)
         .execute()
     )
@@ -197,7 +198,7 @@ def list_dogs(
             id=d["id"],
             name=d["name"],
             breed=d.get("breed"),
-            nose_print_count=1 if d.get("embedding") else 0,
+            nose_print_count=1 if d.get("nose_embedding") else 0,
             profile_photo_url=d.get("profile_photo_url"),
         )
         for d in dogs_res.data
@@ -290,7 +291,7 @@ def enroll_dog(
         avg_embedding = avg_embedding / norm
 
     data = {
-        "embedding": avg_embedding.tolist(),
+        "nose_embedding": avg_embedding.tolist(),
         "embedding_version": ACTIVE_EMBEDDING_VERSION,
     }
     if profile_photo_url:
@@ -434,8 +435,8 @@ def identify_dog(
             "match_all_dogs",
             {
                 "query_embedding": embedding.tolist(),
-                "match_threshold": MATCH_THRESHOLD,
-                "match_count": 3,
+                "match_threshold": 0.0,
+                "match_count": 5,
                 "p_embedding_version": ACTIVE_EMBEDDING_VERSION,
             },
         ).execute()
@@ -471,13 +472,27 @@ def identify_dog(
             owner_email=row.get("owner_email"),
             profile_photo_url=row.get("profile_photo_url"),
             similarity=round(float(row["similarity"]), 4),
-            is_match=float(row["similarity"]) >= MATCH_THRESHOLD,
+            is_match=False, # We will set this manually below based on threshold + margin
         )
         for row in res.data
     ]
 
-    # Check if top result meets threshold
-    if matches[0].similarity < MATCH_THRESHOLD:
+    matches.sort(key=lambda m: m.similarity, reverse=True)
+    top1 = matches[0]
+    top2 = matches[1] if len(matches) > 1 else None
+
+    # Handle the single-candidate case gracefully
+    if top2 is None:
+        matched = top1.similarity >= MATCH_THRESHOLD
+        margin = 1.0
+    else:
+        margin = top1.similarity - top2.similarity
+        matched = (top1.similarity >= MATCH_THRESHOLD and margin >= MATCH_MARGIN)
+
+    # Re-assign the is_match flag for the top candidate
+    top1.is_match = matched
+
+    if not matched:
         return JSONResponse(
             status_code=200,
             content={
@@ -485,10 +500,11 @@ def identify_dog(
                 "matched": False,
                 "code": "NO_MATCH",
                 "message": (
-                    "This dog is not in the database yet. "
+                    "This dog is not in the database yet, or the match is not confident enough. "
                     "Please enroll them first using the Enroll option."
                 ),
-                "confidence": matches[0].similarity,
+                "confidence": top1.similarity,
+                "margin": margin,
             }
         )
 
