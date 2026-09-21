@@ -152,5 +152,5 @@ async def health():
         "models_ready": models_ready(),
         "embedding_dim": 1536,
         "model": "MegaDescriptor-T-CNN-288",
-        "version": "1.0.0"
+        "version": "2.0.0"
     }
