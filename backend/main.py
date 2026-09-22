@@ -112,12 +112,13 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 
 # Import and include routers
-from routers import dogs, report, stats, validate
+from routers import dogs, report, stats, validate, health
 
 os.makedirs("static/uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(dogs.router, prefix="/api")
+app.include_router(health.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(validate.router, prefix="/api")
 app.include_router(report.router, prefix="/api")

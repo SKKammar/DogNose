@@ -13,8 +13,10 @@ const config: Config = {
         border: '#1E2736',     // Hairline separator
         accent: {
           blue: '#4F9CF9',     // Electric Cobalt
+          'blue-dark': '#3B8AE8', // Darker blue for active state
           green: '#34D399',    // Safety Green
           red: '#EF4444',      // Error
+          amber: '#F59E0B',    // Warn
         },
         text: {
           primary: '#F3F4F6',  // High contrast white/gray

@@ -46,10 +46,10 @@ h1, h2, h3, h4, h5, h6 {
     @apply inline-flex items-center justify-center gap-2 bg-accent-blue text-background font-sans font-semibold px-6 py-3 rounded transition-colors border border-transparent;
   }
   .btn-primary:hover {
-    @apply bg-[#3B82F6]; /* slightly darker blue */
+    @apply bg-accent-blue opacity-90;
   }
   .btn-primary:active {
-    @apply bg-[#2563EB];
+    @apply bg-accent-blue opacity-90;
   }
   .btn-primary:disabled {
     @apply opacity-50 cursor-not-allowed;
@@ -67,22 +67,20 @@ h1, h2, h3, h4, h5, h6 {
     @apply block text-xs font-semibold uppercase tracking-[0.06em] text-text-muted mb-1.5;
   }
 
-  /* Badges */
-  .badge {
-    @apply inline-flex items-center gap-1 px-2 py-1 rounded font-mono text-xs font-bold uppercase tracking-tight;
+  /* Badges - Solid (focal only) */
+  .badge-solid {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded font-mono text-xs font-bold uppercase tracking-tight text-background;
   }
-  .badge-success {
-    @apply text-background bg-accent-green;
+
+  /* Badges - Outline (default for most UI) */
+  .badge-outline {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded font-mono text-xs font-bold uppercase tracking-tight bg-transparent border;
   }
-  .badge-warn {
-    @apply text-background bg-[#FBBF24];
-  }
-  .badge-error {
-    @apply text-background bg-accent-red;
-  }
-  .badge-accent {
-    @apply text-background bg-accent-blue;
-  }
+  
+  .badge-outline-success { @apply badge-outline text-accent-green border-accent-green; }
+  .badge-outline-warn    { @apply badge-outline text-[#FBBF24] border-[#FBBF24]; }
+  .badge-outline-error   { @apply badge-outline text-accent-red border-accent-red; }
+  .badge-outline-accent  { @apply badge-outline text-accent-blue border-accent-blue; }
 
   /* Scroll rows */
   .scroll-row {

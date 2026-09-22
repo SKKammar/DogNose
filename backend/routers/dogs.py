@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import date
 
 import numpy as np
 from dependencies import (
@@ -530,6 +531,55 @@ def identify_dog(
     except Exception as e:
         logger.error(f"Failed to log scan: {e}")
 
+    # --- Public health summary (safe subset for finders) ---
+    health = {
+        "allergies": [],
+        "vaccination_status": "unknown",
+        "last_weight_kg": None,
+    }
+    try:
+        dog_id = matches[0].dog_id
+        today_iso = date.today().isoformat()
+
+        all_res = (
+            supabase.table("allergies")
+            .select("allergen, severity")
+            .eq("dog_id", dog_id)
+            .execute()
+        )
+        if all_res.data:
+            health["allergies"] = [
+                {"allergen": a["allergen"], "severity": a.get("severity")}
+                for a in all_res.data
+            ]
+
+        vax_res = (
+            supabase.table("vaccinations")
+            .select("next_due")
+            .eq("dog_id", dog_id)
+            .execute()
+        )
+        if vax_res.data:
+            overdue = any(
+                v.get("next_due") and v["next_due"] < today_iso
+                for v in vax_res.data
+            )
+            health["vaccination_status"] = "overdue" if overdue else "up_to_date"
+
+        w_res = (
+            supabase.table("weight_logs")
+            .select("weight_kg")
+            .eq("dog_id", dog_id)
+            .order("measured_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if w_res.data:
+            health["last_weight_kg"] = w_res.data[0]["weight_kg"]
+    except Exception as e:
+        logger.warning(f"Health summary lookup failed: {e}")
+        # health stays at defaults — do not fail the match
+
     return {
         "match": True,
         "matched": True,
@@ -537,4 +587,5 @@ def identify_dog(
         "confidence": matches[0].similarity,
         "confidence_pct": f"{matches[0].similarity * 100:.1f}%",
         "dog": matches[0].dict(),
+        "health": health,
     }

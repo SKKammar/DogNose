@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
 import CameraCapture from '../components/CameraCapture'
-import { Loader2, Phone, Mail, Copy, ScanFace, ArrowRight, Info } from 'lucide-react'
+import { Loader2, Phone, Mail, Copy, ScanFace, ArrowRight, Info, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { identifyNose, callWithWakeUp, API_URL } from '../../lib/api'
@@ -27,6 +27,12 @@ interface MatchCandidate {
   is_match: boolean
 }
 
+interface IdentifyHealth {
+  allergies: { allergen: string; severity?: 'mild' | 'moderate' | 'severe' | null }[]
+  vaccination_status: 'up_to_date' | 'overdue' | 'unknown'
+  last_weight_kg: number | null
+}
+
 interface IdentifyResult {
   match: boolean
   matched?: boolean
@@ -34,6 +40,7 @@ interface IdentifyResult {
   confidence?: number
   confidence_pct?: string
   dog?: MatchCandidate
+  health?: IdentifyHealth
   error?: boolean
   code?: string
 }
@@ -218,6 +225,73 @@ export default function IdentifyPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Health summary */}
+                  {result.health && (
+                    <div className="px-6 pb-6 border-b border-border">
+                      <p className="text-sm font-semibold text-text-primary mb-3">
+                        Health
+                      </p>
+
+                      {result.health.allergies.length > 0 && (
+                        <div className="mb-3 space-y-1.5">
+                          {result.health.allergies.map((a, i) => {
+                            const tone =
+                              a.severity === 'severe'
+                                ? 'bg-accent-red/10 border-accent-red text-accent-red'
+                                : a.severity === 'moderate'
+                                ? 'bg-accent-amber/10 border-accent-amber text-accent-amber'
+                                : 'bg-surface border-border text-text-secondary'
+                            return (
+                              <div
+                                key={i}
+                                className={`flex items-center gap-2 px-3 py-2 rounded border text-xs ${tone}`}
+                              >
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                <span className="font-medium">Allergic to:</span>
+                                <span className="font-mono">{a.allergen}</span>
+                                {a.severity && (
+                                  <span className="ml-auto font-mono uppercase text-[10px] tracking-wider opacity-80">
+                                    {a.severity}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        {result.health.vaccination_status !== 'unknown' && (
+                          <span
+                            className={`badge-outline ${
+                              result.health.vaccination_status === 'overdue'
+                                ? 'text-accent-amber border-accent-amber'
+                                : 'text-accent-green border-accent-green'
+                            }`}
+                          >
+                            {result.health.vaccination_status === 'overdue'
+                              ? 'Vaccinations overdue'
+                              : 'Vaccinations up to date'}
+                          </span>
+                        )}
+
+                        {result.health.last_weight_kg != null && (
+                          <span className="badge-outline text-text-secondary border-border">
+                            {result.health.last_weight_kg} kg
+                          </span>
+                        )}
+                      </div>
+
+                      {result.health.allergies.length === 0 &&
+                       result.health.vaccination_status === 'unknown' &&
+                       result.health.last_weight_kg == null && (
+                        <p className="text-xs text-text-muted">
+                          No health records on file.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   
                   {/* Owner Contact */}
                   {(result.dog.owner_name || result.dog.owner_phone || result.dog.owner_email) && (

@@ -112,3 +112,104 @@ AS $$
     ORDER BY nose_embedding <=> query_embedding
     LIMIT match_count;
 $$;
+-- ============================================================
+-- Health Records tables (FIX-D02)
+-- ============================================================
+
+CREATE TABLE dognose.allergies (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    dog_id      uuid NOT NULL REFERENCES dognose.dogs(id) ON DELETE CASCADE,
+    allergen    text NOT NULL,
+    severity    text CHECK (severity IN ('mild','moderate','severe')),
+    notes       text,
+    created_at  timestamptz DEFAULT now()
+);
+
+CREATE TABLE dognose.vaccinations (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    dog_id        uuid NOT NULL REFERENCES dognose.dogs(id) ON DELETE CASCADE,
+    vaccine_name  text NOT NULL,
+    date_given    date,
+    next_due      date,
+    notes         text,
+    created_at    timestamptz DEFAULT now()
+);
+
+CREATE TABLE dognose.medications (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    dog_id      uuid NOT NULL REFERENCES dognose.dogs(id) ON DELETE CASCADE,
+    name        text NOT NULL,
+    dosage      text,
+    frequency   text,
+    notes       text,
+    created_at  timestamptz DEFAULT now()
+);
+
+CREATE TABLE dognose.medical_visits (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    dog_id      uuid NOT NULL REFERENCES dognose.dogs(id) ON DELETE CASCADE,
+    visit_date  date,
+    reason      text,
+    vet_name    text,
+    diagnosis   text,
+    notes       text,
+    created_at  timestamptz DEFAULT now()
+);
+
+CREATE TABLE dognose.weight_logs (
+    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    dog_id       uuid NOT NULL REFERENCES dognose.dogs(id) ON DELETE CASCADE,
+    weight_kg    double precision NOT NULL,
+    measured_at  date NOT NULL,
+    notes        text,
+    created_at   timestamptz DEFAULT now()
+);
+
+CREATE INDEX allergies_dog_id_idx       ON dognose.allergies(dog_id);
+CREATE INDEX vaccinations_dog_id_idx    ON dognose.vaccinations(dog_id);
+CREATE INDEX medications_dog_id_idx     ON dognose.medications(dog_id);
+CREATE INDEX medical_visits_dog_id_idx  ON dognose.medical_visits(dog_id);
+CREATE INDEX weight_logs_dog_id_idx     ON dognose.weight_logs(dog_id);
+
+-- RLS (owner-only via join to dogs.user_id)
+ALTER TABLE dognose.allergies      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dognose.vaccinations   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dognose.medications    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dognose.medical_visits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dognose.weight_logs    ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Owner access allergies" ON dognose.allergies
+  FOR ALL USING (EXISTS (
+    SELECT 1 FROM dognose.dogs WHERE dogs.id = allergies.dog_id AND dogs.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Owner access vaccinations" ON dognose.vaccinations
+  FOR ALL USING (EXISTS (
+    SELECT 1 FROM dognose.dogs WHERE dogs.id = vaccinations.dog_id AND dogs.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Owner access medications" ON dognose.medications
+  FOR ALL USING (EXISTS (
+    SELECT 1 FROM dognose.dogs WHERE dogs.id = medications.dog_id AND dogs.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Owner access medical_visits" ON dognose.medical_visits
+  FOR ALL USING (EXISTS (
+    SELECT 1 FROM dognose.dogs WHERE dogs.id = medical_visits.dog_id AND dogs.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Owner access weight_logs" ON dognose.weight_logs
+  FOR ALL USING (EXISTS (
+    SELECT 1 FROM dognose.dogs WHERE dogs.id = weight_logs.dog_id AND dogs.user_id = auth.uid()
+  ));
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON dognose.allergies      TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON dognose.vaccinations   TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON dognose.medications    TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON dognose.medical_visits TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON dognose.weight_logs    TO authenticated;
+GRANT ALL ON dognose.allergies      TO service_role;
+GRANT ALL ON dognose.vaccinations   TO service_role;
+GRANT ALL ON dognose.medications    TO service_role;
+GRANT ALL ON dognose.medical_visits TO service_role;
+GRANT ALL ON dognose.weight_logs    TO service_role;

@@ -7,6 +7,7 @@ import { Loader2, Save, X, Edit3, ChevronLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import HealthRecordsPanel from '../../components/HealthRecordsPanel'
 
 export default function EditDogClient({ id }: { id: string }) {
   const router = useRouter()
@@ -15,6 +16,7 @@ export default function EditDogClient({ id }: { id: string }) {
   const [error, setError] = useState<any>(null)
   const [sessionToken, setSessionToken] = useState<string | null>(null)
   const [dogName, setDogName] = useState('')
+  const [tab, setTab] = useState<'profile' | 'health'>('profile')
 
   const [name, setName] = useState('')
   const [breed, setBreed] = useState('')
@@ -99,6 +101,24 @@ export default function EditDogClient({ id }: { id: string }) {
           </div>
         </motion.div>
 
+        {/* NEW: tab bar */}
+        <div className="flex gap-2 mb-6 border-b border-[var(--color-border)]">
+          {(['profile', 'health'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                tab === t
+                  ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
+                  : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]'
+              }`}
+            >
+              {t === 'profile' ? 'Profile' : 'Health Records'}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'profile' && (
         <motion.form initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} onSubmit={handleSubmit} className="space-y-6">
 
           {/* Basic Info */}
@@ -177,6 +197,17 @@ export default function EditDogClient({ id }: { id: string }) {
             </button>
           </div>
         </motion.form>
+        )}
+
+        {tab === 'health' && (
+          !sessionToken ? (
+            <div className="flex justify-center p-12">
+              <Loader2 className="w-8 h-8 animate-spin text-[var(--color-accent)]" />
+            </div>
+          ) : (
+            <HealthRecordsPanel dogId={id} token={sessionToken} />
+          )
+        )}
       </div>
     </div>
   )

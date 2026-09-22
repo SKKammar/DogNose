@@ -227,3 +227,67 @@ export async function callWithWakeUp<T>(
     throw error
   }
 }
+
+
+export type HealthRecordType =
+  | 'allergies'
+  | 'vaccinations'
+  | 'medications'
+  | 'visits'
+  | 'weights'
+
+export async function listHealthRecords(dogId: string, type: HealthRecordType, token: string) {
+  const res = await fetchWithErrorHandling(`${API_URL}/dogs/${dogId}/health/${type}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  return res.json()
+}
+
+export async function createHealthRecord(
+  dogId: string,
+  type: HealthRecordType,
+  body: Record<string, any>,
+  token: string
+) {
+  const res = await fetchWithErrorHandling(`${API_URL}/dogs/${dogId}/health/${type}`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  return res.json()
+}
+
+export async function updateHealthRecord(
+  dogId: string,
+  type: HealthRecordType,
+  recordId: string,
+  body: Record<string, any>,
+  token: string
+) {
+  const res = await fetchWithErrorHandling(`${API_URL}/dogs/${dogId}/health/${type}/${recordId}`, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  return res.json()
+}
+
+export async function deleteHealthRecord(
+  dogId: string,
+  type: HealthRecordType,
+  recordId: string,
+  token: string
+) {
+  const res = await fetchWithErrorHandling(`${API_URL}/dogs/${dogId}/health/${type}/${recordId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  return res.json()
+}
+
+export async function getHealthSummary(dogId: string, token: string) {
+  const res = await fetchWithErrorHandling(`${API_URL}/dogs/${dogId}/health`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  return res.json()
+}
