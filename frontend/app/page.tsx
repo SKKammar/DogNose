@@ -82,7 +82,7 @@ export default function HomePage() {
             className="w-full aspect-[4/3] bg-surface border border-border flex flex-col items-center justify-center relative overflow-hidden"
           >
             {/* Technical Grid Background */}
-            <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(var(--color-border) 1px, transparent 1px), linear-gradient(90deg, var(--color-border) 1px, transparent 1px)', backgroundSize: '48px 48px' }}></div>
+            <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(#1E2736 1px, transparent 1px), linear-gradient(90deg, #1E2736 1px, transparent 1px)', backgroundSize: '48px 48px' }}></div>
             
             <ScanFace className="w-16 h-16 text-border mb-4" />
             <span className="font-mono text-xs text-text-muted tracking-widest uppercase">CAMERA_FEED_STANDBY</span>

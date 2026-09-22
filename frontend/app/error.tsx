@@ -6,8 +6,8 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] p-4 text-center">
       <h2 className="text-2xl font-bold mb-4">Something went wrong!</h2>
-      <p className="text-[var(--color-muted)] mb-8">{error.message}</p>
-      <button onClick={() => reset()} className="px-6 py-2 bg-[var(--color-accent)] text-white rounded-xl hover:opacity-90 transition">Try again</button>
+      <p className="text-text-muted mb-8">{error.message}</p>
+      <button onClick={() => reset()} className="px-6 py-2 bg-accent-blue text-white rounded-xl hover:opacity-90 transition">Try again</button>
     </div>
   )
 }

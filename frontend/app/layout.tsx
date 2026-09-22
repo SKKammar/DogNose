@@ -31,11 +31,7 @@ export default function RootLayout({
           {children}
         </main>
         <Toaster position="bottom-right" theme="dark" toastOptions={{
-          style: {
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-text)'
-          }
+          className: 'bg-surface border-border text-text-primary'
         }} />
       </body>
     </html>

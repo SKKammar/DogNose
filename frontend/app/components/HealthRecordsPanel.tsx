@@ -158,16 +158,16 @@ function Section({ section, dogId, token }: { section: SectionConfig; dogId: str
   }
 
   return (
-    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden">
+    <div className="bg-surface border border-border rounded-2xl overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between p-5 hover:bg-[var(--color-bg)]/50 transition-colors"
+        className="w-full flex items-center justify-between p-5 hover:bg-background/50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          {open ? <ChevronDown className="w-4 h-4 text-[var(--color-muted)]" /> : <ChevronRight className="w-4 h-4 text-[var(--color-muted)]" />}
-          <span className="font-semibold text-[var(--color-text)]">{section.label}</span>
+          {open ? <ChevronDown className="w-4 h-4 text-text-muted" /> : <ChevronRight className="w-4 h-4 text-text-muted" />}
+          <span className="font-semibold text-text-primary">{section.label}</span>
           {records !== null && (
-            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-muted)]">
+            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-background border border-border text-text-muted">
               {records.length}
             </span>
           )}
@@ -182,15 +182,15 @@ function Section({ section, dogId, token }: { section: SectionConfig; dogId: str
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="px-5 pb-5 border-t border-[var(--color-border)] pt-4 space-y-3">
+            <div className="px-5 pb-5 border-t border-border pt-4 space-y-3">
               {loading && (
                 <div className="flex justify-center py-6">
-                  <Loader2 className="w-5 h-5 animate-spin text-[var(--color-accent)]" />
+                  <Loader2 className="w-5 h-5 animate-spin text-accent-blue" />
                 </div>
               )}
 
               {!loading && records && records.length === 0 && !showForm && (
-                <p className="text-sm text-[var(--color-muted)] py-3">
+                <p className="text-sm text-text-muted py-3">
                   No {section.label.toLowerCase()} recorded yet.
                 </p>
               )}
@@ -198,27 +198,27 @@ function Section({ section, dogId, token }: { section: SectionConfig; dogId: str
               {!loading && records && records.map(r => {
                 const d = section.display(r)
                 return (
-                  <div key={r.id} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--color-bg)]/60 border border-[var(--color-border)]/60 group">
+                  <div key={r.id} className="flex items-start gap-3 p-3 rounded-xl bg-background/60 border border-border/60 group">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-[var(--color-text)]">{d.primary}</span>
+                        <span className="text-sm font-medium text-text-primary">{d.primary}</span>
                         {d.badge && (
                           <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full border ${
                             d.badge.tone === 'warn'
-                              ? 'bg-[var(--color-warn)]/10 text-[var(--color-warn)] border-[var(--color-warn)]/20'
-                              : 'bg-[var(--color-bg)] text-[var(--color-muted)] border-[var(--color-border)]'
+                              ? 'bg-accent-amber/10 text-accent-amber border-accent-amber/20'
+                              : 'bg-background text-text-muted border-border'
                           }`}>
                             {d.badge.text}
                           </span>
                         )}
                       </div>
                       {d.secondary && (
-                        <p className="text-xs text-[var(--color-muted)] mt-1">{d.secondary}</p>
+                        <p className="text-xs text-text-muted mt-1">{d.secondary}</p>
                       )}
                     </div>
                     <button
                       onClick={() => handleDelete(r.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 text-[var(--color-muted)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 rounded-lg transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1.5 text-text-muted hover:text-accent-red hover:bg-accent-red/10 rounded-lg transition-all"
                       title="Delete"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -239,7 +239,7 @@ function Section({ section, dogId, token }: { section: SectionConfig; dogId: str
               ) : (
                 <button
                   onClick={() => setShowForm(true)}
-                  className="flex items-center gap-2 text-sm text-[var(--color-accent)] hover:text-white font-medium py-2 transition-colors"
+                  className="flex items-center gap-2 text-sm text-accent-blue hover:text-white font-medium py-2 transition-colors"
                 >
                   <Plus className="w-4 h-4" /> Add {section.label.replace(/s$/, '')}
                 </button>
@@ -287,11 +287,11 @@ function InlineForm({
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       onSubmit={handleSubmit}
-      className="p-4 rounded-xl bg-[var(--color-bg)] border border-[var(--color-accent)]/40 space-y-3"
+      className="p-4 rounded-xl bg-background border border-accent-blue/40 space-y-3"
     >
       {fields.map(f => (
         <div key={f.key}>
-          <label className="block text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">
             {f.label}{f.required ? ' *' : ''}
           </label>
           {f.type === 'textarea' ? (
@@ -300,14 +300,14 @@ function InlineForm({
               value={values[f.key] ?? ''}
               onChange={e => setField(f.key, e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] resize-none"
+              className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent-blue resize-none"
             />
           ) : f.type === 'select' ? (
             <select
               required={f.required}
               value={values[f.key] ?? ''}
               onChange={e => setField(f.key, e.target.value)}
-              className="w-full px-3 py-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] appearance-none"
+              className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent-blue appearance-none"
             >
               <option value="">—</option>
               {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
@@ -319,7 +319,7 @@ function InlineForm({
               step={f.step}
               value={values[f.key] ?? ''}
               onChange={e => setField(f.key, e.target.value)}
-              className="w-full px-3 py-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
+              className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent-blue"
             />
           )}
         </div>
@@ -329,14 +329,14 @@ function InlineForm({
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-2 rounded-lg border border-[var(--color-border)] text-sm text-[var(--color-text)] hover:bg-[var(--color-surface)] transition flex items-center justify-center gap-1.5"
+          className="flex-1 py-2 rounded-lg border border-border text-sm text-text-primary hover:bg-surface transition flex items-center justify-center gap-1.5"
         >
           <X className="w-3.5 h-3.5" /> Cancel
         </button>
         <button
           type="submit"
           disabled={saving}
-          className="flex-1 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-semibold hover:bg-blue-600 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+          className="flex-1 py-2 rounded-lg bg-accent-blue text-white text-sm font-semibold hover:bg-blue-600 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           {saving ? 'Saving…' : 'Save'}

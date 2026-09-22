@@ -25,9 +25,9 @@ h1, h2, h3, h4, h5, h6 {
     @apply w-full bg-background border border-border rounded px-4 py-3 text-text-primary font-sans text-sm outline-none transition-colors;
   }
   .input-base:focus {
-    @apply border-accent-blue;
-    /* No soft glow shadows, just solid border */
+    @apply border-accent-blue outline outline-2 outline-offset-2 outline-accent-blue;
   }
+  /* No soft glow shadows, just solid border */
   .input-base::placeholder {
     @apply text-text-muted;
   }
