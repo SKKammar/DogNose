@@ -4,6 +4,7 @@ Stage 1: detect dog presence (COCO yolov8n).
 Stage 2: detect nose (custom best.pt).
 """
 import logging
+import os
 
 import cv2
 import numpy as np
@@ -175,6 +176,13 @@ def read_upload_as_array(upload: UploadFile) -> np.ndarray:
     contents = upload.file.read()
     if not contents:
         raise ValueError("Uploaded file is empty.")
+
+    max_bytes = int(os.getenv("MAX_FILE_SIZE_MB", "10")) * 1024 * 1024
+    if len(contents) > max_bytes:
+        raise ImageValidationError(
+            code="FILE_TOO_LARGE",
+            message=f"File too large. Maximum size is {max_bytes // (1024 * 1024)}MB."
+        )
 
     arr = np.frombuffer(contents, dtype=np.uint8)
     image = cv2.imdecode(arr, cv2.IMREAD_COLOR)

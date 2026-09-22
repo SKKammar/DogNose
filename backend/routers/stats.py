@@ -33,12 +33,10 @@ def get_stats():
         return {
             "registered_dogs": registered_dogs,
             "matches_made": matches_made,
-            "owners_reunited": matches_made, # Simulating reunites as equal to matches for now
         }
     except Exception as e:
         logger.error(f"Failed to fetch stats: {e}")
         return {
             "registered_dogs": 0,
             "matches_made": 0,
-            "owners_reunited": 0
         }

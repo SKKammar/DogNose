@@ -43,7 +43,10 @@ export async function fetchWithErrorHandling(url: string, options: RequestInit =
       let errorDetail = null
       try {
         const errorData = await response.json()
-        errorDetail = errorData.detail || errorData.message
+        const d = errorData?.detail
+        if (typeof d === 'string') errorDetail = d
+        else if (d && typeof d === 'object') errorDetail = d.message || JSON.stringify(d)
+        else errorDetail = errorData?.message || `Request failed with status ${response.status}`
       } catch (e) {
         // Not JSON
       }

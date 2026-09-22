@@ -27,7 +27,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${inter.variable} ${syne.variable} ${jetbrains.variable}`}>
         <Navbar />
-        <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] flex flex-col items-center">
+        <main className="min-h-screen bg-background text-text-primary flex flex-col items-center">
           {children}
         </main>
         <Toaster position="bottom-right" theme="dark" toastOptions={{

@@ -32,8 +32,7 @@ EMBEDDING_DIM = 1536
 MODEL_HF_ID = "hf-hub:BVRA/MegaDescriptor-T-CNN-288"
 INPUT_SIZE = 288
 
-# --- Nose detector configuration ---
-NOSE_MODEL_PATH = os.getenv("NOSE_MODEL_PATH", "../models/detector.onnx")
+NOSE_MODEL_PATH = os.getenv("NOSE_MODEL_PATH", "models/best.pt")
 
 # Module-level model holders (initialized by init_models)
 _embedder_model = None

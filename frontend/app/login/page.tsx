@@ -39,40 +39,35 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center px-4 relative">
-      {/* Background glow */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-[var(--color-accent)]/4 blur-[100px]" />
-      </div>
-
+    <div className="min-h-[90vh] w-full flex flex-col items-center justify-center px-4 relative bg-background">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.4 }}
         className="w-full max-w-md relative z-10"
       >
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <Link href="/" className="flex items-center gap-2.5 mb-6 group">
-            <div className="w-10 h-10 rounded-xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 flex items-center justify-center">
-              <PawPrint className="w-5 h-5 text-[var(--color-accent)]" />
+        {/* Header */}
+        <div className="flex flex-col items-center mb-10 text-center">
+          <Link href="/" className="flex items-center gap-3 mb-8 group">
+            <div className="w-12 h-12 bg-surface border border-border flex items-center justify-center group-hover:border-accent-blue transition-colors">
+              <PawPrint className="w-6 h-6 text-text-primary" />
             </div>
-            <span className="font-display font-bold text-xl text-[var(--color-text)]">CANID</span>
+            <span className="font-display font-bold text-2xl text-text-primary uppercase tracking-tight">CANID</span>
           </Link>
-          <h1 className="text-2xl font-bold font-display text-center">
-            {isLogin ? 'Welcome back' : 'Create your account'}
+          <h1 className="text-3xl font-bold font-display uppercase tracking-tight mb-2">
+            {isLogin ? 'Authentication' : 'Initialize Account'}
           </h1>
-          <p className="text-[var(--color-muted)] text-sm mt-1 text-center">
-            {isLogin ? 'Sign in to manage your dogs' : 'Start securing your dog\'s identity'}
+          <p className="font-mono text-text-muted text-xs uppercase tracking-widest">
+            {isLogin ? 'Establish Verified Session' : 'Create Access Credentials'}
           </p>
         </div>
 
-        <div className="card p-8">
+        <div className="bg-surface border border-border p-10 shadow-brutalist">
           {error && (
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2.5 p-3.5 bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 rounded-xl mb-6 text-[var(--color-error)] text-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center gap-3 p-4 bg-background border border-accent-red text-accent-red text-xs font-mono uppercase tracking-widest mb-8"
             >
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
@@ -81,29 +76,29 @@ export default function LoginPage() {
 
           {success && (
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2.5 p-3.5 bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 rounded-xl mb-6 text-[var(--color-success)] text-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center gap-3 p-4 bg-background border border-accent-green text-accent-green text-xs font-mono uppercase tracking-widest mb-8"
             >
               <span>{success}</span>
             </motion.div>
           )}
 
-          <form onSubmit={handleAuth} className="space-y-5">
+          <form onSubmit={handleAuth} className="space-y-6">
             <div>
-              <label className="field-label">Email</label>
+              <label className="field-label">Email Address</label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
                 className="input-base"
-                placeholder="you@example.com"
+                placeholder="USER@DOMAIN.COM"
               />
             </div>
 
             <div>
-              <label className="field-label">Password</label>
+              <label className="field-label">Access Token</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -117,7 +112,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -127,21 +122,21 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full py-3.5 mt-2 rounded-xl"
+              className="btn-primary w-full py-4 mt-4 text-sm tracking-widest uppercase disabled:opacity-50"
             >
               {loading
                 ? <Loader2 className="w-5 h-5 animate-spin" />
-                : (isLogin ? 'Sign In' : 'Create Account')
+                : (isLogin ? 'EXECUTE LOGIN' : 'PROVISION ACCOUNT')
               }
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-[var(--color-border)] text-center">
+          <div className="mt-8 pt-6 border-t border-border text-center">
             <button
               onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess('') }}
-              className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors"
+              className="font-mono text-xs text-text-muted hover:text-text-primary transition-colors uppercase tracking-widest"
             >
-              {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              {isLogin ? "REQUIRE CREDENTIALS? SIGN UP" : 'RETURN TO LOGIN'}
             </button>
           </div>
         </div>

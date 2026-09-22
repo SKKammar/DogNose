@@ -47,12 +47,8 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
     return () => {
       if (stream) stream.getTracks().forEach(t => t.stop())
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- adding stream/startCamera causes infinite re-renders
   }, [mode])
-
-  const assessFrame = (ctx: CanvasRenderingContext2D, width: number, height: number): boolean => {
-    // Sharpness gate placeholder
-    return true
-  }
 
   const capture = useCallback(() => {
     if (mode === 'upload' || isScanning) return
@@ -69,11 +65,6 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
     if (!ctx) return
     ctx.drawImage(video, 0, 0, width, height)
     
-    if (!assessFrame(ctx, width, height)) {
-      alert("Image too blurry, hold still!")
-      return
-    }
-
     canvas.toBlob((blob) => {
       if (blob) {
         setFlash(true)
@@ -117,28 +108,30 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center p-10 border rounded-3xl w-full h-full max-w-md mx-auto backdrop-blur-sm relative overflow-hidden transition ${isDragging ? 'border-[var(--color-accent)] bg-[var(--color-bg)]' : 'border-[var(--color-border)] bg-[var(--color-surface)]'}`}
+        className={`flex flex-col items-center justify-center p-10 border w-full h-[600px] max-w-lg mx-auto relative transition-colors ${
+          isDragging ? 'border-accent-blue bg-surface' : 'border-border bg-background'
+        }`}
       >
-        <Upload className={`${isDragging ? 'text-blue-400' : 'text-zinc-500'} mb-4 transition`} size={48} strokeWidth={1} />
-        <p className="text-zinc-400 mb-6 text-center font-light">
-          {isDragging ? 'Drop photos here' : "Camera unavailable. Upload clear photos of the dog's nose."}
+        <Upload className={`${isDragging ? 'text-accent-blue' : 'text-text-muted'} mb-4`} size={48} strokeWidth={1.5} />
+        <p className="text-text-secondary mb-6 text-center font-sans font-medium text-sm">
+          {isDragging ? 'Drop photos to process' : "Camera unavailable. Upload high-res JPEG/PNG."}
         </p>
         <input 
           type="file" 
           multiple
           accept="image/jpeg,image/png,image/webp" 
           onChange={handleFileUpload}
-          className="block w-full text-sm text-zinc-400 file:mr-4 file:py-3 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 transition"
+          className="block w-full text-sm text-text-muted file:mr-4 file:py-2 file:px-4 file:border-0 file:text-xs file:font-mono file:font-semibold file:bg-surface file:border file:border-border file:text-text-primary hover:file:bg-border transition cursor-pointer"
         />
       </div>
     )
   }
 
   return (
-    <div className="relative w-full h-full max-w-md mx-auto bg-black rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+    <div className="relative w-full h-[70vh] min-h-[500px] max-h-[800px] max-w-2xl mx-auto bg-background border border-border overflow-hidden">
       {error ? (
-        <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-center p-6 bg-zinc-900">
-          {error}
+        <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-text-muted bg-surface">
+          {error.toUpperCase()}
         </div>
       ) : (
         <video 
@@ -146,38 +139,68 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
           autoPlay 
           playsInline 
           muted 
-          className="absolute inset-0 w-full h-full object-cover opacity-90"
+          className="absolute inset-0 w-full h-full object-cover"
         />
       )}
       <canvas ref={canvasRef} className="hidden" />
       
       {/* Flash Effect */}
       {flash && (
-        <div className="absolute inset-0 bg-white z-40 transition-opacity duration-150 animate-out fade-out"></div>
+        <div className="absolute inset-0 bg-text-primary z-40 transition-opacity duration-150"></div>
       )}
       
-      {/* Cinematic HUD Overlay */}
-      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center pt-8">
-        <div className="w-64 h-80 border-2 border-dashed border-[var(--color-accent)]/70 rounded-[100px] relative overflow-hidden bg-black/10 backdrop-blur-[1px] shadow-[0_0_30px_rgba(79,156,249,0.15)]">
+      {/* Strict Technical HUD Overlay */}
+      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+        <div className="relative w-[280px] h-[360px]">
+          {/* Corner brackets */}
+          <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-accent-blue"></div>
+          <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-accent-blue"></div>
+          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-accent-blue"></div>
+          <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-accent-blue"></div>
+          
+          {/* Reticle crosshair */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center">
+             <div className="w-full h-[1px] bg-accent-blue/50"></div>
+             <div className="absolute h-full w-[1px] bg-accent-blue/50"></div>
+          </div>
+
           {/* Scan line animation */}
           {isScanning && (
-            <div className="absolute left-0 right-0 h-1 bg-[var(--color-accent)]/80 shadow-[0_0_15px_rgba(79,156,249,0.8)] animate-scan"></div>
+            <div className="absolute left-0 right-0 h-[2px] bg-accent-blue animate-scan"></div>
           )}
         </div>
       </div>
 
-      <div className="absolute bottom-8 inset-x-0 flex justify-center items-center gap-8">
-        <button onClick={startCamera} className="p-3 bg-zinc-900/40 backdrop-blur-md rounded-full text-zinc-300 hover:bg-zinc-900/60 transition border border-white/10">
-          <RefreshCcw size={24} />
+      {/* Technical Data HUD layer */}
+      <div className="absolute top-4 left-4 font-mono text-[10px] text-accent-blue uppercase tracking-widest bg-background/80 px-2 py-1">
+        SYS_CAM_LIVE
+      </div>
+      
+      {remainingPhotos < Infinity && (
+        <div className="absolute top-4 right-4 font-mono text-[10px] text-text-primary bg-background/80 px-2 py-1 border border-border">
+          REMAINING: {remainingPhotos}
+        </div>
+      )}
+
+      {/* Action Bar */}
+      <div className="absolute bottom-0 inset-x-0 h-24 bg-background/90 border-t border-border flex justify-center items-center gap-8">
+        <button onClick={startCamera} className="w-12 h-12 flex items-center justify-center text-text-muted hover:text-text-primary bg-surface border border-border transition-colors">
+          <RefreshCcw size={20} />
         </button>
         <button 
           onClick={capture} 
           disabled={isScanning}
-          className={`w-20 h-20 rounded-full border-4 p-1 transition duration-300 ${isScanning ? 'border-[var(--color-border)]' : 'border-[var(--color-accent)]'}`}
+          className={`w-16 h-16 flex items-center justify-center transition-colors ${
+            isScanning ? 'bg-surface border border-border cursor-not-allowed' : 'bg-accent-blue hover:bg-[#3B82F6] active:scale-95'
+          }`}
         >
-          <div className={`w-full h-full rounded-full transition-all duration-300 ${isScanning ? 'bg-[var(--color-border)]' : 'bg-white hover:bg-zinc-200 active:scale-90'}`}></div>
+          {isScanning ? (
+            <div className="w-6 h-6 border-2 border-border border-t-text-muted rounded-full animate-spin"></div>
+          ) : (
+            <Camera size={24} className="text-background" />
+          )}
         </button>
-        <div className="w-12 h-12"></div>
+        <div className="w-12 h-12"></div> {/* Balance spacer */}
       </div>
     </div>
   )

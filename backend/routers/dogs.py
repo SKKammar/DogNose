@@ -8,7 +8,7 @@ from dependencies import (
 )
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from services.inference import get_embedding, get_nose_detector
 from services.validator import (
     ImageValidationError,
@@ -64,6 +64,8 @@ class DogUpdate(BaseModel):
 
 
 class DogResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     name: str
     breed: str | None = None
@@ -76,6 +78,7 @@ class DogResponse(BaseModel):
     microchip_id: str | None = None
     notes: str | None = None
     profile_photo_url: str | None = None
+    created_at: str | None = None
 
 
 class DogListItem(BaseModel):
@@ -84,6 +87,7 @@ class DogListItem(BaseModel):
     breed: str | None = None
     nose_print_count: int = 0
     profile_photo_url: str | None = None
+    created_at: str | None = None
 
 
 class MatchCandidate(BaseModel):
@@ -139,7 +143,7 @@ def register_dog(
     """
     supabase = get_service_supabase()
     data = {
-        "owner": user_id,
+        "user_id": user_id,
         "name": dog.name,
         "breed": dog.breed,
         "age": dog.age,
@@ -185,8 +189,8 @@ def list_dogs(
 
     dogs_res = (
         supabase.table("dogs")
-        .select("id, name, breed, nose_embedding, profile_photo_url")
-        .eq("owner", user_id)
+        .select("id, name, breed, nose_embedding, profile_photo_url, created_at")
+        .eq("user_id", user_id)
         .execute()
     )
 
@@ -200,6 +204,7 @@ def list_dogs(
             breed=d.get("breed"),
             nose_print_count=1 if d.get("nose_embedding") else 0,
             profile_photo_url=d.get("profile_photo_url"),
+            created_at=d.get("created_at"),
         )
         for d in dogs_res.data
     ]
@@ -217,13 +222,19 @@ def enroll_dog(
     Enroll multiple nose photos for a dog. Runs the full validation + embedding
     pipeline on each, averages the valid embeddings, and stores the centroid.
     """
+    if len(nose_images) > 15:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "TOO_MANY_PHOTOS", "message": "Maximum 15 nose photos per enrollment."}
+        )
+
     # Verify the dog belongs to this user
     supabase = get_service_supabase()
     dog_check = (
         supabase.table("dogs")
         .select("id")
         .eq("id", dog_id)
-        .eq("owner", user_id)
+        .eq("user_id", user_id)
         .execute()
     )
     if not dog_check.data:
@@ -320,7 +331,7 @@ def enroll_dog(
 def get_scan_logs(user_id: str = Depends(get_current_user_id)):
     """Return scan events for the authenticated user's dogs."""
     supabase = get_service_supabase()
-    dogs_res = supabase.table("dogs").select("id, name").eq("owner", user_id).execute()
+    dogs_res = supabase.table("dogs").select("id, name").eq("user_id", user_id).execute()
     if not dogs_res.data:
         return []
     dog_ids = [d["id"] for d in dogs_res.data]
@@ -343,8 +354,6 @@ def get_scan_logs(user_id: str = Depends(get_current_user_id)):
             "dog_name": dog_names.get(l["matched_dog_id"], "Unknown"),
             "match_confidence": l.get("similarity_score"),
             "scanned_at": l["scanned_at"],
-            "location_lat": l.get("location_lat"),
-            "location_lon": l.get("location_lon"),
         }
         for l in logs_res.data
     ]
@@ -354,7 +363,7 @@ def get_scan_logs(user_id: str = Depends(get_current_user_id)):
 def get_dog(dog_id: str, user_id: str = Depends(get_current_user_id)):
     """Get full dog profile."""
     supabase = get_service_supabase()
-    res = supabase.table("dogs").select("*").eq("id", dog_id).eq("owner", user_id).execute()
+    res = supabase.table("dogs").select("*").eq("id", dog_id).eq("user_id", user_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail={"code": "DOG_NOT_FOUND", "message": "No dog found with that ID."})
     row = res.data[0]
@@ -366,7 +375,7 @@ def delete_dog(dog_id: str, user_id: str = Depends(get_current_user_id)):
     """Delete a dog."""
     supabase = get_service_supabase()
     # verify ownership
-    check = supabase.table("dogs").select("id").eq("id", dog_id).eq("owner", user_id).execute()
+    check = supabase.table("dogs").select("id").eq("id", dog_id).eq("user_id", user_id).execute()
     if not check.data:
         raise HTTPException(status_code=403, detail={"code": "UNAUTHORIZED", "message": "You do not have permission to access this resource."})
     # Due to ON DELETE CASCADE on potential FKs, this might be simpler.
@@ -385,7 +394,7 @@ def update_dog(
     """Update a dog's profile."""
     supabase = get_service_supabase()
     # verify ownership
-    check = supabase.table("dogs").select("id").eq("id", dog_id).eq("owner", user_id).execute()
+    check = supabase.table("dogs").select("id").eq("id", dog_id).eq("user_id", user_id).execute()
     if not check.data:
         raise HTTPException(status_code=403, detail={"code": "UNAUTHORIZED", "message": "You do not have permission to access this resource."})
     

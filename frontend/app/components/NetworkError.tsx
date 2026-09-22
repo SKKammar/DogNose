@@ -23,95 +23,94 @@ export default function NetworkError({ error, onRetry }: NetworkErrorProps) {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-lg mx-auto bg-zinc-900/80 backdrop-blur-xl p-8 rounded-[2rem] border border-zinc-800 shadow-2xl relative overflow-hidden mt-8"
+      className="w-full max-w-2xl mx-auto bg-surface border border-accent-red shadow-brutalist relative mt-8"
     >
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500"></div>
+      <div className="absolute top-0 left-0 w-full h-1 bg-accent-red"></div>
       
-      <div className="flex items-start gap-4 mb-6">
-        <div className="w-14 h-14 shrink-0 bg-red-500/10 rounded-2xl flex items-center justify-center ring-1 ring-red-500/20">
+      <div className="p-8 pb-6 border-b border-border flex items-start gap-5">
+        <div className="w-12 h-12 shrink-0 bg-background border border-accent-red flex items-center justify-center">
           {error.type === 'network' || error.type === 'cors' ? (
-            <WifiOff className="text-red-400" size={28} />
+            <WifiOff className="text-accent-red" size={24} />
           ) : (
-            <AlertTriangle className="text-red-400" size={28} />
+            <AlertTriangle className="text-accent-red" size={24} />
           )}
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-zinc-100 tracking-wide mb-1">Connection Error</h2>
-          <p className="text-red-400 font-medium text-sm">{error.message}</p>
+          <span className="font-mono text-[10px] text-accent-red uppercase tracking-widest mb-1 block">SYS_ERR_NET</span>
+          <h2 className="text-2xl font-display font-bold text-text-primary mb-1 uppercase tracking-tight">Connection Fault</h2>
+          <p className="font-mono text-text-secondary text-sm">{error.message}</p>
         </div>
       </div>
 
-      <div className="space-y-4 mb-8">
-        <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
-          <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider flex items-center gap-2">
-            <Settings size={16} className="text-zinc-500" /> Troubleshooting Guide
+      <div className="p-8 space-y-6">
+        <div className="bg-background border border-border p-5">
+          <h3 className="text-xs font-mono font-bold text-text-muted mb-4 uppercase tracking-wider flex items-center gap-2">
+            <Settings size={14} /> Diagnostic Checklist
           </h3>
-          <ol className="space-y-4 text-sm text-zinc-400">
-            <li className="flex gap-3">
-              <span className="w-5 h-5 shrink-0 flex items-center justify-center bg-zinc-800 rounded-full text-xs font-bold text-zinc-300">1</span>
+          <ul className="space-y-4 font-mono text-sm text-text-secondary">
+            <li className="flex gap-4">
+              <span className="text-accent-blue font-bold">01</span>
               <div>
-                <strong className="text-zinc-200 block mb-1">Verify API URL</strong>
-                <p>Ensure <code className="bg-zinc-800 px-1 py-0.5 rounded text-zinc-300">NEXT_PUBLIC_API_URL</code> is correct.</p>
-                <div className="mt-2 p-2 bg-zinc-900 rounded-lg text-xs font-mono break-all text-blue-400 border border-zinc-800">
-                  Current: {process.env.NEXT_PUBLIC_API_URL || 'Not Set (using defaults)'}
+                <strong className="text-text-primary block mb-0.5">Verify API URL</strong>
+                <p className="text-xs text-text-muted">Ensure <code className="bg-surface border border-border px-1 py-0.5 text-text-primary">NEXT_PUBLIC_API_URL</code> is correct.</p>
+                <div className="mt-2 p-2 bg-surface border border-border text-xs text-text-primary">
+                  TARGET: {process.env.NEXT_PUBLIC_API_URL || 'DEFAULT'}
                 </div>
               </div>
             </li>
             
-            <li className="flex gap-3">
-              <span className="w-5 h-5 shrink-0 flex items-center justify-center bg-zinc-800 rounded-full text-xs font-bold text-zinc-300">2</span>
+            <li className="flex gap-4">
+              <span className="text-accent-blue font-bold">02</span>
               <div>
-                <strong className="text-zinc-200 block mb-1">Check CORS Configurations</strong>
-                <p>Verify that your backend allows requests from this domain.</p>
+                <strong className="text-text-primary block mb-0.5">Check CORS Policy</strong>
+                <p className="text-xs text-text-muted">Verify backend allows origins.</p>
               </div>
             </li>
 
-            <li className="flex gap-3">
-              <span className="w-5 h-5 shrink-0 flex items-center justify-center bg-zinc-800 rounded-full text-xs font-bold text-zinc-300">3</span>
+            <li className="flex gap-4">
+              <span className="text-accent-blue font-bold">03</span>
               <div>
-                <strong className="text-zinc-200 block mb-1">Server Status</strong>
-                <p className="flex items-start gap-2">
-                  <Clock size={14} className="text-orange-400 mt-0.5 shrink-0" />
-                  Ensure your backend server is running and accessible.
+                <strong className="text-text-primary block mb-0.5">Server Health</strong>
+                <p className="text-xs text-text-muted flex items-center gap-2">
+                  <Clock size={12} className="text-text-muted" /> Check Uvicorn backend status.
                 </p>
               </div>
             </li>
             
-            <li className="flex gap-3">
-              <span className="w-5 h-5 shrink-0 flex items-center justify-center bg-zinc-800 rounded-full text-xs font-bold text-zinc-300">4</span>
+            <li className="flex gap-4">
+              <span className="text-accent-blue font-bold">04</span>
               <div>
-                <strong className="text-zinc-200 block mb-1">Clear Cache</strong>
-                <p className="flex items-center gap-2">
-                  <RefreshCcw size={14} className="text-blue-400" />
-                  Try a hard refresh (Ctrl+F5 or Cmd+Shift+R) to clear browser caching.
+                <strong className="text-text-primary block mb-0.5">Hard Refresh</strong>
+                <p className="text-xs text-text-muted flex items-center gap-2">
+                  <RefreshCcw size={12} /> Clear browser cache (Ctrl+F5).
                 </p>
               </div>
             </li>
-          </ol>
+          </ul>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="px-8 pb-8 flex flex-col sm:flex-row gap-4">
         <button 
           onClick={handleRetry}
           disabled={isRetrying}
-          className="flex-1 py-3 px-6 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 py-3 px-6 bg-accent-red text-background font-sans font-semibold hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 border border-transparent"
         >
           {isRetrying ? (
-            <><RefreshCw className="animate-spin" size={20} /> Retrying...</>
+            <><RefreshCw className="animate-spin" size={18} /> RETRYING...</>
           ) : (
-            <><RefreshCw size={20} /> Try Again</>
+            <><RefreshCw size={18} /> INITIATE RETRY</>
           )}
         </button>
         <a 
           href="https://github.com/SKKammar/DogNose/issues" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="flex-1 py-3 px-6 bg-zinc-800 text-zinc-300 rounded-xl font-medium hover:bg-zinc-700 transition flex items-center justify-center gap-2"
+          className="flex-1 py-3 px-6 bg-transparent text-text-primary font-sans font-semibold border border-border hover:border-text-secondary hover:bg-background transition-colors flex items-center justify-center gap-2"
         >
-          <ExternalLink size={18} /> Get Support
+          <ExternalLink size={18} /> VIEW LOGS
         </a>
       </div>
     </motion.div>

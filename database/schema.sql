@@ -6,9 +6,9 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE SCHEMA IF NOT EXISTS dognose;
 
-GRANT USAGE ON SCHEMA dognose TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA dognose TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA dognose TO anon, authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON dognose.dogs TO authenticated;
+GRANT SELECT ON dognose.dogs TO anon;
+GRANT ALL ON dognose.scan_logs TO service_role;
 
 -- Table: dognose.dogs
 CREATE TABLE dognose.dogs (

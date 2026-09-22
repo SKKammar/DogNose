@@ -21,3 +21,19 @@ services:
         value: "dog-photos"
       - key: PYTHON_VERSION
         value: "3.11.9"
+      - key: NOSE_MODEL_PATH
+        sync: false
+      - key: EMBEDDER_MODEL_PATH
+        sync: false
+      - key: MATCH_THRESHOLD
+        value: "0.56"
+      - key: MATCH_MARGIN
+        value: "0.08"
+      - key: USE_FINETUNED
+        value: "true"
+      - key: ENABLE_CLAHE
+        value: "false"
+      - key: IDENTIFY_RATE_LIMIT
+        value: "10/minute"
+      - key: MAX_FILE_SIZE_MB
+        value: "10"
