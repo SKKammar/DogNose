@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
 import CameraCapture from '../components/CameraCapture'
-import { Loader2, Fingerprint, ChevronLeft, Camera, Phone, Mail, Copy, AlertTriangle, PawPrint } from 'lucide-react'
+import { Loader2, ChevronLeft, Phone, Mail, Copy, AlertTriangle, PawPrint, ScanFace, ArrowRight, Info } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { identifyNose, callWithWakeUp, ApiError, API_URL } from '../../lib/api'
@@ -37,493 +37,267 @@ interface IdentifyResult {
   code?: string
 }
 
-// Error code → user-facing message and icon
 const ERROR_MESSAGES: Record<string, { icon: string; title: string; hint: string }> = {
-  BLURRY: {
-    icon: "📸",
-    title: "Image too blurry",
-    hint: "Hold the camera steady and wait for it to focus before capturing."
-  },
-  DARK: {
-    icon: "💡",
-    title: "Too dark",
-    hint: "Move to a brighter area or turn on a light above the dog."
-  },
-  NOT_A_DOG: {
-    icon: "🐾",
-    title: "No dog detected",
-    hint: "Make sure your dog is clearly visible in the photo."
-  },
-  NO_NOSE: {
-    icon: "👃",
-    title: "Nose not visible",
-    hint: "Point the camera directly at your dog&apos;s nose from about 15–20 cm away."
-  },
-  NOSE_TOO_SMALL: {
-    icon: "🔍",
-    title: "Too far away",
-    hint: "Get closer — the nose should fill most of the frame."
-  },
-  NO_MATCH: {
-    icon: "❓",
-    title: "Dog not recognized",
-    hint: "This dog isn&apos;t enrolled yet. Use the Enroll option to register them first."
-  },
-  BAD_INPUT: {
-    icon: "⚠️",
-    title: "Invalid image",
-    hint: "Please upload a JPEG or PNG photo."
-  },
-  MODELS_LOADING: {
-    icon: "⏳",
-    title: "System starting up",
-    hint: "The ML models are still loading. Please wait a moment and try again."
-  }
+  BLURRY: { icon: '📸', title: 'Image too blurry', hint: 'Hold the camera steady and wait for it to focus before capturing.' },
+  DARK: { icon: '💡', title: 'Too dark', hint: 'Move to a brighter area or turn on a light above the dog.' },
+  NOT_A_DOG: { icon: '🐾', title: 'No dog detected', hint: 'Make sure your dog is clearly visible in the photo.' },
+  NO_NOSE: { icon: '👃', title: 'Nose not visible', hint: 'Point the camera directly at the nose from about 15–20 cm away.' },
+  NOSE_TOO_SMALL: { icon: '🔍', title: 'Too far away', hint: 'Get closer — the nose should fill most of the frame.' },
+  NO_MATCH: { icon: '❓', title: 'Dog not recognized', hint: "This dog isn't enrolled yet. Use the Enroll option to register them first." },
+  BAD_INPUT: { icon: '⚠️', title: 'Invalid image', hint: 'Please upload a JPEG or PNG photo.' },
+  MODELS_LOADING: { icon: '⏳', title: 'System starting up', hint: 'The ML models are still loading. Please wait a moment and try again.' },
 }
 
-interface ValidationError {
-  icon: string
-  title: string
-  hint: string
-}
+const PROCESSING_STEPS_LABELS = ['Locating nose...', 'Extracting biometric signature...', 'Searching registry...']
 
 export default function IdentifyPage() {
   const [status, setStatus] = useState<IdentifyStatus>('idle')
   const [result, setResult] = useState<IdentifyResult | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
-  const [validationError, setValidationError] = useState<ValidationError | null>(null)
+  const [validationError, setValidationError] = useState<{ icon: string; title: string; hint: string } | null>(null)
   const [processingStep, setProcessingStep] = useState(0)
   const [isWaking, setIsWaking] = useState(false)
   const [stats, setStats] = useState({ registered_dogs: 0 })
-  const [showTips, setShowTips] = useState(false)
-  const [showReportModal, setShowReportModal] = useState(false)
-  const [reportNote, setReportNote] = useState('')
-  
-  const wakeTimerRef = useRef<NodeJS.Timeout | null>(null)
   const stepTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    fetch(`${API_URL}/stats`)
-      .then(res => res.json())
-      .then(data => setStats(data))
-      .catch(() => {})
+    fetch(`${API_URL}/stats`).then(r => r.json()).then(d => setStats(d)).catch(() => {})
+    return () => { if (stepTimerRef.current) clearInterval(stepTimerRef.current) }
   }, [])
 
-  const PROCESSING_STEPS = [
-    { icon: <ScanBox />, label: 'Locating nose...' },
-    { icon: <Waveform />, label: 'Extracting biometric signature...' },
-    { icon: <Loader2 className="animate-spin text-[var(--color-accent)]" />, label: `Searching ${stats.registered_dogs || '...'} registered dogs...` },
-  ]
-
-  useEffect(() => {
-    if (status === 'processing') {
-      setProcessingStep(0)
-      let step = 0
-      stepTimerRef.current = setInterval(() => {
-        step++
-        if (step < PROCESSING_STEPS.length) {
-          setProcessingStep(step)
-        }
-      }, 1500)
-
-      wakeTimerRef.current = setTimeout(() => setIsWaking(true), 8000)
-    }
-    return () => {
-      if (stepTimerRef.current) clearInterval(stepTimerRef.current)
-      if (wakeTimerRef.current) clearTimeout(wakeTimerRef.current)
-    }
-  }, [status, stats.registered_dogs])
-
-  const handleCapture = async (blobData: Blob | Blob[]) => {
-    const blob = Array.isArray(blobData) ? blobData[0] : blobData
-
-    // Reset all previous state
+  const handleCapture = async (blob: Blob | Blob[]) => {
+    const imageBlob = Array.isArray(blob) ? blob[0] : blob
+    setStatus('processing')
+    setProcessingStep(0)
     setResult(null)
     setError(null)
     setValidationError(null)
-    setStatus('processing')
-    setIsWaking(false)
+
+    stepTimerRef.current = setInterval(() => {
+      setProcessingStep(prev => Math.min(prev + 1, PROCESSING_STEPS_LABELS.length - 1))
+    }, 1800)
 
     try {
-      const data = await callWithWakeUp(() => identifyNose(blob), setIsWaking)
+      const data = await callWithWakeUp(() => identifyNose(imageBlob), setIsWaking)
+      if (stepTimerRef.current) clearInterval(stepTimerRef.current)
 
-      // Check for structured validation errors (422 responses returned as JSON)
-      if (data.error) {
-        const info = ERROR_MESSAGES[data.code] ?? {
-          icon: "⚠️",
-          title: "Something went wrong",
-          hint: data.message || "An unexpected error occurred."
-        }
-        setValidationError(info)
+      if (data.error && data.code) {
+        setValidationError(ERROR_MESSAGES[data.code] || { icon: '⚠️', title: 'Unknown error', hint: data.message || 'Please try again.' })
         setStatus('validation_error')
         return
       }
 
-      // Check for no-match (200 with matched: false)
-      if (data.matched === false || (data.match === false && !data.error)) {
-        const info = ERROR_MESSAGES["NO_MATCH"]
-        setValidationError(info)
-        setStatus('no_match')
-        return
-      }
-
-      // Success — match found
-      if (data.match && data.dog) {
-        setResult(data)
-        setStatus('match')
-      } else {
-        setStatus('no_match')
-      }
+      setResult(data)
+      setStatus(data.match || data.matched ? 'match' : 'no_match')
     } catch (err: any) {
+      if (stepTimerRef.current) clearInterval(stepTimerRef.current)
       setError(err)
       setStatus('error')
+    } finally {
+      setIsWaking(false)
     }
   }
 
-  const handleCopy = () => {
-    if (!result?.dog) return
-    const d = result.dog
-    const text = `Name: ${d.name}\nPhone: ${d.owner_phone || 'N/A'}\nEmail: ${d.owner_email || 'N/A'}`
-    navigator.clipboard.writeText(text)
-    toast.success('Copied contact details to clipboard!')
+  const reset = async () => {
+    setStatus('idle'); setResult(null); setError(null); setValidationError(null); setProcessingStep(0); setIsWaking(false)
   }
 
-  const submitReport = async () => {
-    if (!result?.dog?.dog_id) return
-    try {
-      await fetch(`${API_URL}/report`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dog_id: result.dog.dog_id, note: reportNote })
-      })
-      toast.success('Report submitted. Thank you for your feedback.')
-      setShowReportModal(false)
-      setReportNote('')
-    } catch (err) {
-      toast.error('Failed to submit report. Please try again.')
-    }
-  }
-
-  const getConfidenceColor = (similarity: number) => {
-    if (similarity >= 0.80) return 'bg-[var(--color-success)]'
-    if (similarity >= 0.62) return 'bg-[var(--color-accent)]'
-    return 'bg-[var(--color-warn)]'
-  }
-
-  const resetToIdle = () => {
-    setStatus('idle')
-    setResult(null)
-    setError(null)
-    setValidationError(null)
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => toast.success(`${label} copied`))
   }
 
   return (
-    <div className="h-[calc(100vh-64px)] overflow-hidden p-4 pt-8 flex flex-col items-center w-full relative z-10">
-      
-      {/* Ambient background only for identify page */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[60vw] h-[60vw] rounded-full border border-[var(--color-accent)] opacity-10 animate-pulse-slow pointer-events-none blur-3xl z-0"></div>
+    <div className="min-h-screen w-full flex flex-col items-center px-4 py-10">
+      <div className="w-full max-w-lg">
 
-      <AnimatePresence mode="wait">
-        {/* Idle — Camera */}
-        {status === 'idle' && (
-          <motion.div 
-            key="idle"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="w-full h-full max-w-md relative z-10 flex flex-col pb-4"
-          >
-            <div className="flex flex-col items-center mb-6 shrink-0">
-              <Camera className="w-10 h-10 text-[var(--color-accent)] mb-2" />
-              <h2 className="text-xl font-bold font-display text-[var(--color-text)]">Point at any dog&apos;s nose</h2>
-            </div>
-            
-            <div className="flex-1 min-h-0 w-full relative">
-              <CameraCapture onCapture={handleCapture} />
-            </div>
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold font-display mb-1">Identify a Dog</h1>
+          <p className="text-[var(--color-muted)] text-sm">
+            {stats.registered_dogs > 0
+              ? `Searching across ${stats.registered_dogs} registered dogs.`
+              : 'No account required — scan any dog to identify them.'}
+          </p>
+        </div>
 
-            <div className="mt-4 shrink-0">
-              <button 
-                onClick={() => setShowTips(!showTips)}
-                className="w-full text-center text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors py-2"
-              >
-                Tips for a good scan {showTips ? '▲' : '▼'}
-              </button>
-              <AnimatePresence>
-                {showTips && (
-                  <motion.div 
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <ul className="text-sm text-[var(--color-muted)] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4 space-y-2 mt-2">
-                      <li className="flex items-center gap-2"><span>•</span> Get within 30cm of the nose</li>
-                      <li className="flex items-center gap-2"><span>•</span> Face the nose toward light</li>
-                      <li className="flex items-center gap-2"><span>•</span> Keep the dog still for 1 second</li>
-                    </ul>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
+        <AnimatePresence mode="wait">
 
-        {/* Processing State */}
-        {status === 'processing' && (
-          <motion.div 
-            key="processing"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-24 w-full max-w-md relative z-10"
-          >
-            <div className="w-32 h-32 mb-12 relative flex items-center justify-center">
-              {PROCESSING_STEPS[processingStep]?.icon}
-            </div>
-
-            {!isWaking ? (
-              <div className="space-y-6 w-full px-8">
-                {PROCESSING_STEPS.map((pStep, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ 
-                      opacity: i <= processingStep ? 1 : 0.3,
-                      x: 0,
-                    }}
-                    className={`text-center transition-colors duration-300 ${
-                      i === processingStep ? 'text-[var(--color-text)] font-semibold text-lg' : 'text-[var(--color-muted)] text-sm'
-                    }`}
-                  >
-                    {pStep.label}
-                  </motion.div>
-                ))}
+          {/* IDLE — Camera */}
+          {status === 'idle' && (
+            <motion.div key="idle" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <div className="w-full aspect-[3/4] mb-5">
+                <CameraCapture onCapture={handleCapture} remainingPhotos={1} />
               </div>
-            ) : (
-              <div className="text-center animate-pulse">
-                <h2 className="text-lg font-medium text-[var(--color-text)] mb-2">Waking up secure environment...</h2>
-                <p className="text-[var(--color-muted)] text-sm">Takes a few extra seconds</p>
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* Validation Error State — specific, actionable feedback */}
-        {status === 'validation_error' && validationError && (
-          <motion.div 
-            key="validation_error"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center w-full max-w-md relative z-10"
-          >
-            <div className="w-24 h-24 rounded-full bg-[var(--color-surface)] border-2 border-[var(--color-warn)] flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(234,179,8,0.15)]">
-              <span className="text-4xl">{validationError.icon}</span>
-            </div>
-            <h2 className="text-3xl font-bold font-display text-[var(--color-text)] mb-3">{validationError.title}</h2>
-            <p className="text-[var(--color-muted)] mb-10 text-center max-w-sm">{validationError.hint}</p>
-            
-            <div className="w-full flex flex-col sm:flex-row gap-4">
-              <button 
-                onClick={resetToIdle}
-                className="flex-1 py-4 bg-[var(--color-accent)] text-white text-center rounded-xl font-semibold hover:bg-blue-600 transition shadow-[0_0_15px_rgba(79,156,249,0.2)]"
-              >
-                Try Again
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* No Match State */}
-        {status === 'no_match' && (
-          <motion.div 
-            key="no_match"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center w-full max-w-md relative z-10"
-          >
-            <div className="w-24 h-24 rounded-full bg-[var(--color-surface)] border-2 border-[var(--color-warn)] flex items-center justify-center mb-6">
-              <span className="text-4xl">❓</span>
-            </div>
-            <h2 className="text-3xl font-bold font-display text-[var(--color-text)] mb-3">Dog not recognized</h2>
-            <p className="text-[var(--color-muted)] mb-10 text-center">This dog isn&apos;t enrolled yet. Register them first to enable identification.</p>
-            
-            <div className="w-full flex flex-col sm:flex-row gap-4">
-              <Link href="/enroll" className="flex-1 py-4 bg-[var(--color-accent)] text-white text-center rounded-xl font-semibold hover:bg-blue-600 transition shadow-[0_0_15px_rgba(79,156,249,0.2)]">
-                Register this dog
-              </Link>
-              <button 
-                onClick={resetToIdle}
-                className="flex-1 py-4 bg-transparent border border-[var(--color-border)] text-[var(--color-text)] rounded-xl font-semibold hover:bg-[var(--color-surface)] transition"
-              >
-                Try again
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Match Found State */}
-        {status === 'match' && result?.dog && (
-          <motion.div 
-            key="match"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-md relative z-10"
-          >
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-3xl overflow-hidden shadow-2xl">
-              <div className="p-6 border-b border-[var(--color-border)] flex flex-col items-center text-center">
-                <div className="w-24 h-24 rounded-full overflow-hidden mb-4 border-2 border-[var(--color-success)] bg-[var(--color-bg)] flex items-center justify-center relative">
-                  {result.dog.profile_photo_url ? (
-                    <img src={result.dog.profile_photo_url} alt="Dog" className="w-full h-full object-cover" />
-                  ) : (
-                    <PawPrint className="w-10 h-10 text-[var(--color-muted)]" />
-                  )}
-                  <div className="absolute inset-0 ring-inset ring-2 ring-black/10 rounded-full"></div>
-                </div>
-                <h2 className="text-3xl font-display font-bold text-[var(--color-text)] mb-1">{result.dog.name}</h2>
-                {result.dog.breed && <p className="text-[var(--color-muted)]">{result.dog.breed}</p>}
-                
-                {/* Confidence Meter */}
-                <div className="w-full mt-6 flex flex-col items-center">
-                  <div className="flex justify-between w-full text-xs font-mono text-[var(--color-muted)] mb-2 px-2">
-                    <span>Similarity</span>
-                    <span className="text-[var(--color-text)]">{(result.dog.similarity * 100).toFixed(1)}%</span>
-                  </div>
-                  <div className="w-full h-2.5 bg-[var(--color-bg)] rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${result.dog.similarity * 100}%` }}
-                      transition={{ duration: 1, ease: "easeOut" }}
-                      className={`h-full rounded-full ${getConfidenceColor(result.dog.similarity)}`}
-                    />
-                  </div>
-                </div>
-                
-                {result.dog.microchip_id && (
-                  <div className="mt-4 inline-flex items-center bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-1 rounded-md text-xs font-mono text-[var(--color-muted)]">
-                    Microchip: {result.dog.microchip_id}
-                  </div>
-                )}
-              </div>
-
-              {/* Contact Block */}
-              <div className="p-6 bg-[var(--color-bg)]/50">
-                <p className="text-sm font-semibold text-[var(--color-text)] mb-4">Owner Contact</p>
-                <motion.div 
-                  initial="hidden"
-                  animate="visible"
-                  variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
-                  className="grid grid-cols-1 sm:grid-cols-3 gap-3"
-                >
-                  <motion.a variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }} href={`tel:${result.dog.owner_phone || ''}`} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:shadow-[0_0_15px_rgba(79,156,249,0.1)] text-[var(--color-text)] transition-all duration-300 hover:-translate-y-1 group">
-                    <Phone className="w-5 h-5 mb-2 text-[var(--color-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
-                    <span className="text-xs font-medium">Call</span>
-                  </motion.a>
-                  <motion.a variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }} href={`mailto:${result.dog.owner_email || ''}`} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:shadow-[0_0_15px_rgba(79,156,249,0.1)] text-[var(--color-text)] transition-all duration-300 hover:-translate-y-1 group">
-                    <Mail className="w-5 h-5 mb-2 text-[var(--color-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
-                    <span className="text-xs font-medium">Email</span>
-                  </motion.a>
-                  <motion.button variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }} onClick={handleCopy} className="flex flex-col items-center justify-center p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:shadow-[0_0_15px_rgba(79,156,249,0.1)] text-[var(--color-text)] transition-all duration-300 hover:-translate-y-1 group">
-                    <Copy className="w-5 h-5 mb-2 text-[var(--color-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
-                    <span className="text-xs font-medium">Copy Details</span>
-                  </motion.button>
-                </motion.div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-4">
-              <button 
-                onClick={resetToIdle}
-                className="w-full py-4 bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] rounded-xl font-semibold hover:bg-[var(--color-border)] transition"
-              >
-                Scan Another Dog
-              </button>
-              
-              <button 
-                onClick={() => setShowReportModal(true)}
-                className="text-xs text-[var(--color-muted)] underline text-center hover:text-[var(--color-text)]"
-              >
-                Report this match as incorrect
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Network/Server Error */}
-        {status === 'error' && error && (
-          <motion.div 
-            key="error"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="w-full flex justify-center pb-20 relative z-10"
-          >
-            <NetworkError 
-              error={error} 
-              onRetry={async () => resetToIdle()} 
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Report Modal */}
-      <AnimatePresence>
-        {showReportModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-sm bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6"
-            >
-              <h3 className="text-lg font-bold text-[var(--color-text)] mb-2">Report Match</h3>
-              <p className="text-sm text-[var(--color-muted)] mb-4">Please provide details on why you believe this match is incorrect.</p>
-              <textarea 
-                value={reportNote}
-                onChange={e => setReportNote(e.target.value)}
-                className="w-full h-24 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-3 text-sm text-[var(--color-text)] mb-4 focus:outline-none focus:border-[var(--color-accent)]"
-                placeholder="E.g., The dog in the photo looks different from the scan..."
-              />
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowReportModal(false)}
-                  className="flex-1 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text)] font-medium hover:bg-[var(--color-bg)]"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={submitReport}
-                  className="flex-1 py-2 rounded-lg bg-[var(--color-error)] text-white font-medium hover:bg-red-600"
-                >
-                  Submit
-                </button>
+              <div className="card p-4 flex items-start gap-3">
+                <Info className="w-4 h-4 text-[var(--color-accent)] shrink-0 mt-0.5" />
+                <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                  Point the camera directly at the dog&apos;s nose from 15–20 cm away. Ensure good lighting and hold steady.
+                </p>
               </div>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
+          )}
 
-// Mini components for processing animations
-function ScanBox() {
-  return (
-    <div className="w-20 h-20 border-2 border-dashed border-[var(--color-accent)] rounded-2xl relative overflow-hidden flex items-center justify-center shadow-[0_0_20px_rgba(79,156,249,0.3)]">
-      <PawPrint className="w-8 h-8 text-[var(--color-accent)] opacity-50" />
-      <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--color-accent)] animate-scan shadow-[0_0_10px_rgba(79,156,249,1)]"></div>
-    </div>
-  )
-}
+          {/* PROCESSING */}
+          {status === 'processing' && (
+            <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center py-24 text-center">
+              {isWaking ? (
+                <>
+                  <Loader2 className="w-12 h-12 animate-spin text-[var(--color-accent)] mb-5" />
+                  <h2 className="text-xl font-bold mb-2">Waking up the engine...</h2>
+                  <p className="text-[var(--color-muted)] text-sm max-w-xs">The ML models are loading. This takes 30–60 seconds the first time.</p>
+                </>
+              ) : (
+                <>
+                  <div className="relative w-20 h-20 mb-6">
+                    <div className="absolute inset-0 rounded-full border-2 border-[var(--color-accent)]/20 animate-ping" />
+                    <div className="w-20 h-20 rounded-full bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30 flex items-center justify-center">
+                      <ScanFace className="w-8 h-8 text-[var(--color-accent)]" />
+                    </div>
+                  </div>
+                  <div className="space-y-2 w-full max-w-xs">
+                    {PROCESSING_STEPS_LABELS.map((label, idx) => (
+                      <div key={label} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 ${idx === processingStep ? 'bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20' : idx < processingStep ? 'opacity-40' : 'opacity-20'}`}>
+                        {idx < processingStep ? (
+                          <span className="w-4 h-4 text-[var(--color-success)] text-xs">✓</span>
+                        ) : idx === processingStep ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-[var(--color-accent)] shrink-0" />
+                        ) : (
+                          <span className="w-4 h-4 rounded-full border border-[var(--color-muted)] shrink-0" />
+                        )}
+                        <span className={`text-sm ${idx === processingStep ? 'text-[var(--color-text)] font-medium' : 'text-[var(--color-muted)]'}`}>
+                          {idx === 2 ? `Searching ${stats.registered_dogs || '...'} registered dogs...` : label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </motion.div>
+          )}
 
-function Waveform() {
-  return (
-    <div className="flex gap-1 h-12 items-center justify-center">
-      {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-        <motion.div 
-          key={i}
-          animate={{ height: ['20%', '100%', '20%'] }}
-          transition={{ duration: 1, repeat: Infinity, delay: i * 0.1, ease: 'easeInOut' }}
-          className="w-1.5 bg-[var(--color-accent-2)] rounded-full shadow-[0_0_10px_rgba(167,139,250,0.5)]"
-        />
-      ))}
+          {/* MATCH */}
+          {status === 'match' && result?.dog && (
+            <motion.div key="match" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+              <div className="card overflow-hidden">
+                {/* Match header */}
+                <div className="bg-[var(--color-success)]/10 border-b border-[var(--color-success)]/20 px-6 py-4 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[var(--color-success)]/20 flex items-center justify-center">
+                    <span className="text-[var(--color-success)] text-sm">✓</span>
+                  </div>
+                  <div>
+                    <p className="text-[var(--color-success)] font-semibold text-sm">Match Found</p>
+                    <p className="text-[var(--color-success)]/70 text-xs font-mono">
+                      {result.confidence_pct || `${((result.confidence || 0) * 100).toFixed(1)}%`} confidence
+                    </p>
+                  </div>
+                </div>
+
+                {/* Dog photo + info */}
+                <div className="flex gap-5 p-6">
+                  <div className="w-24 h-24 rounded-2xl overflow-hidden bg-[var(--color-surface-2)] border border-[var(--color-border)] shrink-0">
+                    {result.dog.profile_photo_url ? (
+                      <img src={result.dog.profile_photo_url} alt={result.dog.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <PawPrint className="w-8 h-8 text-[var(--color-muted)] opacity-40" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-2xl font-bold font-display mb-1">{result.dog.name}</h2>
+                    {result.dog.breed && <p className="text-[var(--color-muted)] text-sm mb-2">{result.dog.breed}</p>}
+                    <div className="flex flex-wrap gap-2">
+                      {result.dog.age && <span className="badge badge-accent">{result.dog.age} yrs</span>}
+                      {result.dog.sex && <span className="badge badge-accent">{result.dog.sex}</span>}
+                      {result.dog.color_markings && <span className="badge badge-accent">{result.dog.color_markings}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Owner contact */}
+                {(result.dog.owner_name || result.dog.owner_phone || result.dog.owner_email) && (
+                  <div className="border-t border-[var(--color-border)] px-6 py-5">
+                    <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-semibold mb-4">Owner Contact</p>
+                    <div className="space-y-3">
+                      {result.dog.owner_name && (
+                        <p className="text-sm font-medium">{result.dog.owner_name}</p>
+                      )}
+                      {result.dog.owner_phone && (
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                            <Phone className="w-4 h-4 text-[var(--color-accent)]" />
+                            {result.dog.owner_phone}
+                          </div>
+                          <button onClick={() => copyToClipboard(result.dog!.owner_phone!, 'Phone')} className="text-xs text-[var(--color-muted)] hover:text-[var(--color-accent)] flex items-center gap-1 transition-colors">
+                            <Copy className="w-3 h-3" /> Copy
+                          </button>
+                        </div>
+                      )}
+                      {result.dog.owner_email && (
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                            <Mail className="w-4 h-4 text-[var(--color-accent)]" />
+                            {result.dog.owner_email}
+                          </div>
+                          <button onClick={() => copyToClipboard(result.dog!.owner_email!, 'Email')} className="text-xs text-[var(--color-muted)] hover:text-[var(--color-accent)] flex items-center gap-1 transition-colors">
+                            <Copy className="w-3 h-3" /> Copy
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* View full profile */}
+                <div className="border-t border-[var(--color-border)] px-6 py-4">
+                  <Link href={`/dogs/${result.dog.dog_id}`} className="btn-primary w-full justify-center py-3 rounded-xl">
+                    View Full Profile <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+
+              <button onClick={reset} className="btn-ghost w-full py-3 rounded-xl">Scan Again</button>
+            </motion.div>
+          )}
+
+          {/* NO MATCH */}
+          {status === 'no_match' && (
+            <motion.div key="no_match" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+              <div className="card p-8 text-center">
+                <div className="w-16 h-16 rounded-full bg-[var(--color-warn)]/10 border border-[var(--color-warn)]/20 flex items-center justify-center mx-auto mb-5">
+                  <PawPrint className="w-8 h-8 text-[var(--color-warn)]" />
+                </div>
+                <h2 className="text-xl font-bold mb-2">No match found</h2>
+                <p className="text-[var(--color-muted)] text-sm mb-6">This dog doesn&apos;t appear to be enrolled in the registry yet.</p>
+                <div className="space-y-3">
+                  <Link href="/enroll" className="btn-primary w-full justify-center py-3 rounded-xl">Register This Dog</Link>
+                  <button onClick={reset} className="btn-ghost w-full py-3 rounded-xl">Try Again</button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* VALIDATION ERROR */}
+          {status === 'validation_error' && validationError && (
+            <motion.div key="val_error" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+              <div className="card p-8 text-center">
+                <div className="text-4xl mb-4">{validationError.icon}</div>
+                <h2 className="text-xl font-bold mb-2">{validationError.title}</h2>
+                <p className="text-[var(--color-muted)] text-sm mb-6">{validationError.hint}</p>
+                <button onClick={reset} className="btn-primary w-full justify-center py-3 rounded-xl">Try Again</button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* NETWORK ERROR */}
+          {status === 'error' && error && (
+            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <NetworkError error={error} onRetry={reset} />
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

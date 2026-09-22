@@ -2,33 +2,35 @@
 import React, { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Fingerprint, Loader2, AlertCircle } from 'lucide-react'
-import AppHeader from '../components/AppHeader'
+import { PawPrint, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import Link from 'next/link'
+import { motion } from 'framer-motion'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [isLogin, setIsLogin] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const router = useRouter()
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
-    
+    setSuccess('')
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
+        router.push('/dashboard')
       } else {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
+        setSuccess('Check your email to confirm your account.')
       }
-      
-      // Redirect to enroll on successful auth
-      router.push('/enroll')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -37,72 +39,113 @@ export default function LoginPage() {
   }
 
   return (
-    <>
-      <AppHeader />
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 pt-24 w-full z-10 relative">
-        <div className="w-full max-w-md bg-zinc-900/50 backdrop-blur-md p-8 rounded-[2rem] border border-zinc-800 shadow-2xl relative overflow-hidden">
-          
-          <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center ring-1 ring-blue-500/30">
-              <Fingerprint className="text-blue-400" size={32} />
-            </div>
-          </div>
+    <div className="min-h-screen w-full flex flex-col items-center justify-center px-4 relative">
+      {/* Background glow */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-[var(--color-accent)]/4 blur-[100px]" />
+      </div>
 
-          <h1 className="text-2xl font-bold text-center text-zinc-100 mb-8 tracking-wide">
-            {isLogin ? 'Sign in to CANID' : 'Create CANID Account'}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="w-full max-w-md relative z-10"
+      >
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <Link href="/" className="flex items-center gap-2.5 mb-6 group">
+            <div className="w-10 h-10 rounded-xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 flex items-center justify-center">
+              <PawPrint className="w-5 h-5 text-[var(--color-accent)]" />
+            </div>
+            <span className="font-display font-bold text-xl text-[var(--color-text)]">CANID</span>
+          </Link>
+          <h1 className="text-2xl font-bold font-display text-center">
+            {isLogin ? 'Welcome back' : 'Create your account'}
           </h1>
+          <p className="text-[var(--color-muted)] text-sm mt-1 text-center">
+            {isLogin ? 'Sign in to manage your dogs' : 'Start securing your dog\'s identity'}
+          </p>
+        </div>
 
+        <div className="card p-8">
           {error && (
-            <div className="flex items-center gap-2 p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-6 text-red-400 text-sm">
-              <AlertCircle size={16} />
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2.5 p-3.5 bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 rounded-xl mb-6 text-[var(--color-error)] text-sm"
+            >
+              <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
-            </div>
+            </motion.div>
           )}
 
-          <form onSubmit={handleAuth} className="space-y-4">
+          {success && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2.5 p-3.5 bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 rounded-xl mb-6 text-[var(--color-success)] text-sm"
+            >
+              <span>{success}</span>
+            </motion.div>
+          )}
+
+          <form onSubmit={handleAuth} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1">Email</label>
-              <input 
+              <label className="field-label">Email</label>
+              <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={e => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                className="input-base"
                 placeholder="you@example.com"
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1">Password</label>
-              <input 
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
-                placeholder="••••••••"
-              />
+              <label className="field-label">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="input-base pr-12"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-            
-            <button 
-              type="submit" 
+
+            <button
+              type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition flex items-center justify-center mt-2 disabled:opacity-50"
+              className="btn-primary w-full py-3.5 mt-2 rounded-xl"
             >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : (isLogin ? 'Access System' : 'Register Identity')}
+              {loading
+                ? <Loader2 className="w-5 h-5 animate-spin" />
+                : (isLogin ? 'Sign In' : 'Create Account')
+              }
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <button 
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-zinc-400 hover:text-zinc-200 text-sm transition"
+          <div className="mt-6 pt-5 border-t border-[var(--color-border)] text-center">
+            <button
+              onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess('') }}
+              className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors"
             >
-              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+              {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
             </button>
           </div>
         </div>
-      </div>
-    </>
+      </motion.div>
+    </div>
   )
 }

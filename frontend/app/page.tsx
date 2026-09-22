@@ -1,14 +1,19 @@
 'use client'
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Camera, ScanFace, CheckCircle, Smartphone, ShieldCheck } from 'lucide-react'
+import { ScanFace, Camera, ShieldCheck, Smartphone, ArrowRight, PawPrint } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { API_URL } from '../lib/api'
 
 interface Stats {
-  registered_dogs: number;
-  matches_made: number;
-  owners_reunited: number;
+  registered_dogs: number
+  matches_made: number
+  owners_reunited: number
+}
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0 }
 }
 
 export default function HomePage() {
@@ -16,158 +21,199 @@ export default function HomePage() {
 
   useEffect(() => {
     fetch(`${API_URL}/stats`)
-      .then(res => res.json())
-      .then(data => setStats(data))
-      .catch(err => console.error(err))
+      .then(r => r.json())
+      .then(d => setStats(d))
+      .catch(() => {})
   }, [])
 
   return (
-    <div className="flex flex-col items-center min-h-screen w-full relative overflow-hidden">
-      
-      {/* Animated signature noseprint scan ring ambient background */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] min-w-[300px] min-h-[300px] rounded-full border border-[var(--color-accent)] opacity-30 animate-pulse-slow pointer-events-none blur-xl"></div>
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[30vw] h-[30vw] max-w-[450px] max-h-[450px] min-w-[200px] min-h-[200px] rounded-full border-2 border-[var(--color-accent)] opacity-20 animate-pulse-slow pointer-events-none delay-75"></div>
+    <div className="flex flex-col w-full">
 
-      {/* Hero Section */}
-      <section className="flex flex-col items-center justify-center pt-32 pb-20 px-4 text-center z-10 w-full max-w-4xl mx-auto">
-        <h1 className="text-5xl md:text-7xl font-bold font-display text-[var(--color-text)] mb-6 tracking-tight">
-          Every Nose.<br/>
-          <span className="text-[var(--color-accent)]">One Identity.</span>
-        </h1>
-        <p className="text-lg md:text-xl text-[var(--color-muted)] mb-4 max-w-2xl font-light">
-          A biometric registry for dogs. Just like a human fingerprint, every dog&apos;s nose pattern is completely unique. Find lost pets in seconds.
-        </p>
-        <div className="mb-12">
-          <span className="inline-block px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 rounded-full text-xs font-semibold uppercase tracking-wider">
-            For learning purpose only
-          </span>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center mb-16">
-          <Link href="/identify" className="bg-[var(--color-accent)] hover:bg-blue-600 text-white font-semibold py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(79,156,249,0.25)] hover:shadow-[0_0_30px_rgba(79,156,249,0.4)] transition-all flex items-center justify-center gap-2 text-lg">
-            <ScanFace className="w-5 h-5" />
-            Scan a Dog
-          </Link>
-          <Link href="/enroll" className="bg-transparent border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white font-semibold py-4 px-8 rounded-xl transition-all flex items-center justify-center gap-2 text-lg">
-            <Camera className="w-5 h-5" />
-            Register Your Dog
-          </Link>
+      {/* HERO */}
+      <section className="relative w-full min-h-[92vh] flex flex-col items-center justify-center text-center px-6 overflow-hidden">
+        {/* Background glow */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[var(--color-accent)]/5 blur-[120px]" />
+          <div className="absolute top-1/3 left-1/3 w-[300px] h-[300px] rounded-full bg-[var(--color-accent-2)]/5 blur-[80px]" />
         </div>
 
-        {/* Live Stats */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-3xl border-t border-[var(--color-border)] pt-8"
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          transition={{ staggerChildren: 0.15 }}
+          className="relative z-10 max-w-4xl mx-auto"
         >
-          <div className="flex flex-col items-center">
-            <span className="text-3xl font-display font-bold text-[var(--color-text)] mb-1">{stats.registered_dogs}</span>
-            <span className="text-sm text-[var(--color-muted)]">Dogs Registered</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-3xl font-display font-bold text-[var(--color-text)] mb-1">{stats.matches_made}</span>
-            <span className="text-sm text-[var(--color-muted)]">Matches Made</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-3xl font-display font-bold text-[var(--color-text)] mb-1">{stats.owners_reunited}</span>
-            <span className="text-sm text-[var(--color-muted)]">Owners Reunited</span>
-          </div>
+          <motion.div variants={fadeUp} className="mb-6">
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 text-[var(--color-accent)] text-xs font-semibold uppercase tracking-wider font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
+              Biometric Dog Registry
+            </span>
+          </motion.div>
+
+          <motion.h1 variants={fadeUp} className="text-5xl md:text-7xl font-bold font-display tracking-tight mb-6 leading-[1.05]">
+            Every Nose.<br />
+            <span className="text-[var(--color-accent)]">One Identity.</span>
+          </motion.h1>
+
+          <motion.p variants={fadeUp} className="text-lg md:text-xl text-[var(--color-muted)] mb-10 max-w-2xl mx-auto font-light leading-relaxed">
+            A biometric registry for dogs. Just like a human fingerprint, every dog&apos;s nose pattern is completely unique.
+            Enroll once. Identify anywhere.
+          </motion.p>
+
+          <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+            <Link href="/identify" className="btn-primary text-base py-3.5 px-8 rounded-xl shadow-[var(--shadow-accent)]">
+              <ScanFace className="w-5 h-5" />
+              Scan a Dog
+            </Link>
+            <Link href="/enroll" className="btn-ghost text-base py-3.5 px-8 rounded-xl">
+              <Camera className="w-5 h-5" />
+              Register Your Dog
+            </Link>
+          </motion.div>
+
+          {/* Stats */}
+          <motion.div variants={fadeUp} className="grid grid-cols-3 gap-6 max-w-lg mx-auto pt-8 border-t border-[var(--color-border)]">
+            {[
+              { value: stats.registered_dogs, label: 'Dogs Registered' },
+              { value: stats.matches_made, label: 'Matches Made' },
+              { value: stats.owners_reunited, label: 'Owners Reunited' },
+            ].map(s => (
+              <div key={s.label} className="flex flex-col items-center gap-1">
+                <span className="text-3xl font-display font-bold text-[var(--color-text)]">{s.value}</span>
+                <span className="text-xs text-[var(--color-muted)] text-center">{s.label}</span>
+              </div>
+            ))}
+          </motion.div>
         </motion.div>
       </section>
 
-      {/* How It Works */}
-      <section className="w-full bg-[var(--color-surface)] border-y border-[var(--color-border)] py-20 px-4 z-10">
+      {/* HOW IT WORKS */}
+      <section className="w-full py-24 px-6 bg-[var(--color-surface)] border-y border-[var(--color-border)]">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold font-display text-center mb-16">How It Works</h2>
-          <motion.div 
+          <motion.div
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, margin: "-50px" }}
-            variants={{
-              hidden: {},
-              visible: { transition: { staggerChildren: 0.2 } }
-            }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-12 relative"
+            viewport={{ once: true }}
+            transition={{ staggerChildren: 0.1 }}
+            className="text-center mb-16"
           >
-            
-            {/* Desktop connecting line */}
-            <div className="hidden md:block absolute top-8 left-[16%] right-[16%] h-0.5 bg-[var(--color-border)] z-0"></div>
+            <motion.p variants={fadeUp} className="text-xs font-mono font-semibold uppercase tracking-widest text-[var(--color-accent)] mb-3">How It Works</motion.p>
+            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold font-display">Three steps to identify any dog</motion.h2>
+          </motion.div>
 
-            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="flex flex-col items-center text-center relative z-10 group cursor-default">
-              <div className="w-16 h-16 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-accent)] flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(79,156,249,0.3)] transition-all duration-300">
-                <Camera className="w-7 h-7 text-[var(--color-accent)]" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">1. Snap</h3>
-              <p className="text-[var(--color-muted)]">Take a photo of any dog&apos;s nose</p>
-            </motion.div>
-            
-            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="flex flex-col items-center text-center relative z-10 group cursor-default">
-              <div className="w-16 h-16 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-accent)] flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(79,156,249,0.3)] transition-all duration-300">
-                <ScanFace className="w-7 h-7 text-[var(--color-accent)]" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">2. Match</h3>
-              <p className="text-[var(--color-muted)]">Our AI searches the entire registry instantly</p>
-            </motion.div>
-            
-            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="flex flex-col items-center text-center relative z-10 group cursor-default">
-              <div className="w-16 h-16 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-accent)] flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(79,156,249,0.3)] transition-all duration-300">
-                <CheckCircle className="w-7 h-7 text-[var(--color-accent)]" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">3. Reunite</h3>
-              <p className="text-[var(--color-muted)]">Contact the owner directly — no middleman</p>
-            </motion.div>
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ staggerChildren: 0.15 }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-8 relative"
+          >
+            <div className="hidden md:block absolute top-10 left-[18%] right-[18%] h-px bg-gradient-to-r from-transparent via-[var(--color-border)] to-transparent" />
+            {[
+              { icon: Camera, step: '01', title: 'Snap', desc: "Take a clear photo of the dog's nose from 15–20 cm away." },
+              { icon: ScanFace, step: '02', title: 'Match', desc: 'Our AI extracts a biometric signature and searches the entire registry instantly.' },
+              { icon: PawPrint, step: '03', title: 'Reunite', desc: "Get the owner's contact details directly — no middleman, no delay." },
+            ].map(({ icon: Icon, step, title, desc }) => (
+              <motion.div key={step} variants={fadeUp} className="flex flex-col items-center text-center group">
+                <div className="relative mb-6">
+                  <div className="w-20 h-20 rounded-2xl bg-[var(--color-bg)] border border-[var(--color-border)] flex items-center justify-center group-hover:border-[var(--color-accent)] group-hover:shadow-[var(--shadow-accent)] transition-all duration-300">
+                    <Icon className="w-8 h-8 text-[var(--color-accent)]" />
+                  </div>
+                  <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[var(--color-accent)] text-white text-[10px] font-mono font-bold flex items-center justify-center">{step}</span>
+                </div>
+                <h3 className="text-xl font-bold mb-2">{title}</h3>
+                <p className="text-[var(--color-muted)] text-sm leading-relaxed">{desc}</p>
+              </motion.div>
+            ))}
           </motion.div>
         </div>
       </section>
 
-      {/* Trust / Social Proof */}
-      <section className="py-20 px-4 w-full max-w-5xl mx-auto z-10 text-center">
-        <h2 className="text-3xl font-bold font-display mb-12">Built for real emergencies</h2>
-        
-        <motion.div 
+      {/* FEATURES */}
+      <section className="w-full py-24 px-6">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            transition={{ staggerChildren: 0.1 }}
+            className="text-center mb-16"
+          >
+            <motion.p variants={fadeUp} className="text-xs font-mono font-semibold uppercase tracking-widest text-[var(--color-accent)] mb-3">Built for real emergencies</motion.p>
+            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold font-display">Designed for speed when it matters most</motion.h2>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ staggerChildren: 0.12 }}
+            className="grid grid-cols-1 md:grid-cols-2 gap-6"
+          >
+            {[
+              { icon: Smartphone, title: 'Works anywhere', desc: 'Identify requires no account, works on any smartphone browser, and returns results in under 3 seconds.' },
+              { icon: ShieldCheck, title: 'Privacy first', desc: "Owner contact info is only revealed when a positive biometric match is made. Your data is secure." },
+            ].map(({ icon: Icon, title, desc }) => (
+              <motion.div key={title} variants={fadeUp} className="card card-lift p-8 flex gap-5">
+                <div className="w-12 h-12 rounded-xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 flex items-center justify-center shrink-0">
+                  <Icon className="w-6 h-6 text-[var(--color-accent)]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold mb-2">{title}</h3>
+                  <p className="text-[var(--color-muted)] text-sm leading-relaxed">{desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* CTA BAND */}
+      <section className="w-full py-20 px-6 bg-[var(--color-surface)] border-t border-[var(--color-border)]">
+        <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
-          variants={{
-            hidden: {},
-            visible: { transition: { staggerChildren: 0.2 } }
-          }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12"
+          viewport={{ once: true }}
+          transition={{ staggerChildren: 0.1 }}
+          className="max-w-2xl mx-auto text-center"
         >
-          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 flex flex-col items-center hover:border-[var(--color-accent)] hover:shadow-[0_0_30px_rgba(79,156,249,0.1)] transition-all duration-300 hover:-translate-y-1">
-            <Smartphone className="w-10 h-10 text-[var(--color-accent)] mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Works anywhere</h3>
-            <p className="text-[var(--color-muted)]">Identify requires no account, works on any smartphone browser, and returns results in under 3 seconds.</p>
-          </motion.div>
-          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 flex flex-col items-center hover:border-[var(--color-accent)] hover:shadow-[0_0_30px_rgba(79,156,249,0.1)] transition-all duration-300 hover:-translate-y-1">
-            <ShieldCheck className="w-10 h-10 text-[var(--color-accent)] mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Privacy first</h3>
-            <p className="text-[var(--color-muted)]">Owner contact info is only revealed when a positive biometric match is made. Your data is secure.</p>
+          <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold font-display mb-4">Ready to secure your dog&apos;s identity?</motion.h2>
+          <motion.p variants={fadeUp} className="text-[var(--color-muted)] mb-8">Enrollment takes under 2 minutes. Your dog&apos;s nose print is stored securely and matched in seconds.</motion.p>
+          <motion.div variants={fadeUp}>
+            <Link href="/enroll" className="btn-primary text-base py-3.5 px-8 rounded-xl inline-flex">
+              Register Your Dog <ArrowRight className="w-5 h-5" />
+            </Link>
           </motion.div>
         </motion.div>
-
-        <div className="inline-block bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full px-6 py-3 shadow-[0_0_15px_rgba(167,139,250,0.15)]">
-          <p className="text-[var(--color-accent-2)] font-mono font-medium flex items-center gap-2 text-sm">
-            <span className="w-2 h-2 rounded-full bg-[var(--color-accent-2)] animate-pulse"></span>
-            Identification accuracy: We are actively working on improving it
-          </p>
-        </div>
       </section>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-[var(--color-border)] bg-[var(--color-surface)] py-8 mt-auto z-10">
-        <div className="max-w-5xl mx-auto px-4 flex flex-col items-center">
-          <div className="flex gap-6 mb-6">
-            <Link href="/" className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]">Home</Link>
-            <Link href="/identify" className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]">Identify</Link>
-            <Link href="/enroll" className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]">Enroll</Link>
-            <a href="https://github./SKKammar/DogNose" target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]">GitHub</a>
-            <Link href="/privacy" className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]">Privacy</Link>
+      {/* FOOTER */}
+      <footer className="w-full border-t border-[var(--color-border)] py-10 px-6">
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-2">
+            <PawPrint className="w-4 h-4 text-[var(--color-accent)]" />
+            <span className="font-display font-bold text-sm text-[var(--color-text)]">CANID</span>
+            <span className="text-xs text-[var(--color-muted)] ml-2">Biometric Dog Registry</span>
           </div>
-          <p className="text-xs text-[var(--color-muted)] text-center max-w-2xl">
-            CANID uses ArcFace biometric technology — the same family of algorithms used in human facial recognition systems.
-          </p>
+          <div className="flex gap-6">
+            {[
+              { label: 'Identify', href: '/identify' },
+              { label: 'Register', href: '/enroll' },
+              { label: 'Dashboard', href: '/dashboard' },
+              { label: 'GitHub', href: 'https://github.com/SKKammar/DogNose', external: true },
+            ].map(l => (
+              <a
+                key={l.label}
+                href={l.href}
+                target={l.external ? '_blank' : undefined}
+                rel={l.external ? 'noopener noreferrer' : undefined}
+                className="text-xs text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors"
+              >
+                {l.label}
+              </a>
+            ))}
+          </div>
+          <p className="text-xs text-[var(--color-muted)]">© 2026 CANID. For learning purposes only.</p>
         </div>
       </footer>
     </div>

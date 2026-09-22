@@ -1,110 +1,85 @@
 'use client'
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { listDogs, getScanLogs, deleteDog } from '../../lib/api'
-import { Loader2, Trash2, ShieldCheck, PawPrint, Clock, MapPin, Search, Edit } from 'lucide-react'
+import { listDogs, deleteDog, getScanLogs } from '../../lib/api'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
-import AppHeader from '../components/AppHeader'
+import {
+  PawPrint, Plus, Edit, Trash2, Loader2, ShieldCheck,
+  Search, Clock, MapPin, ScanFace, BarChart2, ArrowRight
+} from 'lucide-react'
+import { toast } from 'sonner'
 
 interface Dog {
   id: string
   name: string
-  breed: string | null
-  nose_print_count: number
-  profile_photo_url: string | null
+  breed?: string
+  age?: number
+  sex?: string
+  profile_photo_url?: string
   created_at: string
+  embedding_count?: number
 }
 
 interface ScanLog {
   id: string
   dog_name: string
   scanned_at: string
-  location_lat: number | null
-  location_lon: number | null
-  match_confidence: number | null
+  match_confidence?: number
+  location_lat?: number
+  location_lon?: number
 }
 
+const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const formatTime = (d: string) => new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+
 export default function DashboardPage() {
+  const router = useRouter()
   const [session, setSession] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
   const [dogs, setDogs] = useState<Dog[]>([])
   const [logs, setLogs] = useState<ScanLog[]>([])
+  const [loading, setLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setLoading(false); return }
       setSession(session)
-      if (session) {
-        fetchDashboardData(session.access_token)
-      } else {
+      try {
+        const [dogsData, logsData] = await Promise.all([
+          listDogs(session.access_token),
+          getScanLogs(session.access_token, 20)
+        ])
+        setDogs(dogsData)
+        setLogs(logsData)
+      } catch (err) {
+        toast.error('Failed to load dashboard')
+      } finally {
         setLoading(false)
       }
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      if (session) {
-        fetchDashboardData(session.access_token)
-      } else {
-        setDogs([])
-        setLogs([])
-        setLoading(false)
-      }
-    })
-
-    return () => subscription.unsubscribe()
+    }
+    init()
   }, [])
 
-  const fetchDashboardData = async (token: string) => {
-    try {
-      const [dogsData, logsData] = await Promise.all([
-        listDogs(token),
-        getScanLogs(token, 20)
-      ])
-      setDogs(dogsData)
-      setLogs(logsData)
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to load dashboard data')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete ${name}? This action cannot be undone and will remove all associated biometric data.`)) return
-    
+    if (!confirm(`Remove ${name} from the registry? This cannot be undone.`)) return
     setIsDeleting(id)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('Not authenticated')
-      
       await deleteDog(id, session.access_token)
-      setDogs(dogs.filter(d => d.id !== id))
-      toast.success(`${name} has been deleted`)
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to delete dog')
+      setDogs(prev => prev.filter(d => d.id !== id))
+      toast.success(`${name} removed from registry`)
+    } catch {
+      toast.error('Failed to remove dog')
     } finally {
       setIsDeleting(null)
     }
   }
 
-  const formatDate = (isoStr: string) => {
-    const d = new Date(isoStr)
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-  }
-
-  const formatTime = (isoStr: string) => {
-    const d = new Date(isoStr)
-    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-  }
-
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center w-full bg-[var(--color-bg)]">
+      <div className="min-h-screen flex items-center justify-center w-full">
         <Loader2 className="w-8 h-8 animate-spin text-[var(--color-accent)]" />
       </div>
     )
@@ -112,171 +87,197 @@ export default function DashboardPage() {
 
   if (!session) {
     return (
-      <div className="min-h-screen p-6 flex flex-col items-center justify-center w-full z-10 relative bg-[var(--color-bg)]">
-        <div className="flex flex-col items-center justify-center py-20 w-full max-w-md bg-[var(--color-surface)] border border-[var(--color-border)] p-8 rounded-3xl text-center shadow-2xl">
-          <ShieldCheck className="text-[var(--color-accent)] w-12 h-12 mb-4" />
-          <h2 className="text-2xl font-bold font-display text-[var(--color-text)] mb-3">Dashboard Access</h2>
-          <p className="text-[var(--color-muted)] mb-8 text-sm">Sign in to manage your dogs and view scan activity logs.</p>
-          <Link href="/login" className="w-full py-4 bg-[var(--color-text)] text-[var(--color-bg)] rounded-xl font-bold hover:bg-white transition">
-            Sign In
-          </Link>
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 w-full">
+        <div className="card p-10 max-w-sm w-full text-center">
+          <div className="w-14 h-14 rounded-2xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 flex items-center justify-center mx-auto mb-5">
+            <ShieldCheck className="w-7 h-7 text-[var(--color-accent)]" />
+          </div>
+          <h2 className="text-xl font-bold mb-2">Sign in required</h2>
+          <p className="text-[var(--color-muted)] text-sm mb-6">Access your dogs and scan activity after signing in.</p>
+          <Link href="/login" className="btn-primary w-full justify-center py-3 rounded-xl">Sign In</Link>
         </div>
       </div>
     )
   }
 
+  const recentLogs = logs.slice(0, 5)
+
   return (
-    <>
-      <AppHeader />
-      <div className="min-h-screen p-4 pt-24 max-w-5xl mx-auto w-full relative z-10">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold font-display text-[var(--color-text)] tracking-tight">Dashboard</h1>
-            <p className="text-[var(--color-muted)] mt-1">Manage your dogs and monitor identity scans.</p>
-          </div>
-          <Link href="/enroll" className="inline-flex items-center justify-center bg-[var(--color-accent)] hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl shadow-[0_0_15px_rgba(79,156,249,0.2)] hover:shadow-[0_0_25px_rgba(79,156,249,0.4)] transition-all gap-2">
-            <PawPrint className="w-4 h-4" />
-            Register Dog
-          </Link>
+    <div className="min-h-screen w-full max-w-6xl mx-auto px-4 sm:px-6 py-10">
+
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10"
+      >
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold font-display tracking-tight">Dashboard</h1>
+          <p className="text-[var(--color-muted)] mt-1 text-sm">Manage your dogs and monitor identity scans.</p>
         </div>
+        <Link href="/enroll" className="btn-primary py-2.5 px-5 rounded-xl shrink-0">
+          <Plus className="w-4 h-4" /> Register Dog
+        </Link>
+      </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Main Content: Dogs List */}
-          <div className="lg:col-span-2 space-y-6">
-            <h2 className="text-xl font-semibold text-[var(--color-text)] flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
-              <ShieldCheck className="w-5 h-5 text-[var(--color-accent)]" /> Your Registered Dogs
-            </h2>
-            
-            {dogs.length === 0 ? (
-              <div className="bg-[var(--color-surface)] border border-[var(--color-border)] border-dashed rounded-3xl p-12 text-center flex flex-col items-center">
-                <div className="w-16 h-16 bg-[var(--color-bg)] rounded-full flex items-center justify-center mb-4">
-                  <PawPrint className="w-8 h-8 text-[var(--color-muted)] opacity-50" />
-                </div>
-                <h3 className="text-lg font-semibold text-[var(--color-text)] mb-2">No dogs registered yet</h3>
-                <p className="text-[var(--color-muted)] text-sm mb-6 max-w-sm">Secure your dog&apos;s identity by enrolling their unique nose print into the Canid registry.</p>
-                <Link href="/enroll" className="text-[var(--color-accent)] hover:text-white font-medium transition-colors">
-                  Get started →
-                </Link>
-              </div>
-            ) : (
-              <motion.div 
-                initial="hidden" 
-                animate="visible" 
-                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }} 
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
-              >
-                <AnimatePresence>
-                  {dogs.map(dog => (
-                    <motion.div 
-                      key={dog.id}
-                      variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 hover:border-[var(--color-accent)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(79,156,249,0.1)] group relative overflow-hidden"
-                    >
-                      <div className="flex gap-4">
-                        <div className="w-16 h-16 rounded-full overflow-hidden bg-[var(--color-bg)] shrink-0 border border-[var(--color-border)] flex items-center justify-center">
-                          {dog.profile_photo_url ? (
-                            <img src={dog.profile_photo_url} alt={dog.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <PawPrint className="w-6 h-6 text-[var(--color-muted)]" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-bold font-display text-[var(--color-text)] truncate pr-8">{dog.name}</h3>
-                          <p className="text-[var(--color-muted)] text-sm truncate">{dog.breed || 'Unknown breed'}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--color-success)]/10 text-[var(--color-success)] border border-[var(--color-success)]/20 uppercase">
-                              Active
-                            </span>
-                            <span className="text-xs text-[var(--color-muted)]">
-                              Enrolled {formatDate(dog.created_at)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                        <Link
-                          href={`/edit/${dog.id}`}
-                          className="p-2 text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 rounded-lg transition-colors"
-                          title="Edit profile"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Link>
-                        <button 
-                          onClick={() => handleDelete(dog.id, dog.name)}
-                          disabled={isDeleting === dog.id}
-                          className="p-2 text-[var(--color-muted)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 rounded-lg transition-colors disabled:opacity-50"
-                          title="Delete profile"
-                        >
-                          {isDeleting === dog.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </motion.div>
-            )}
-          </div>
-
-          {/* Sidebar: Scan Logs */}
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-[var(--color-text)] flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
-              <Search className="w-5 h-5 text-[var(--color-accent-2)]" /> Scan Activity
-            </h2>
-            
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-3xl p-5 shadow-lg max-h-[600px] overflow-y-auto custom-scrollbar">
-              {logs.length === 0 ? (
-                <div className="text-center py-10">
-                  <Clock className="w-8 h-8 text-[var(--color-muted)] mx-auto mb-3 opacity-30" />
-                  <p className="text-[var(--color-muted)] text-sm">No scans logged yet.</p>
-                </div>
-              ) : (
-                <motion.div 
-                  initial="hidden" 
-                  animate="visible" 
-                  variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }} 
-                  className="space-y-4"
-                >
-                  {logs.map(log => (
-                    <motion.div 
-                      key={log.id} 
-                      variants={{ hidden: { opacity: 0, x: -10 }, visible: { opacity: 1, x: 0 } }}
-                      className="flex gap-4 p-3 rounded-xl hover:bg-[var(--color-bg)] transition-all duration-300 border border-transparent hover:border-[var(--color-border)] hover:shadow-md"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-[var(--color-bg)] border border-[var(--color-border)] flex items-center justify-center shrink-0">
-                        <Search className="w-4 h-4 text-[var(--color-accent-2)]" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-[var(--color-text)] font-medium">
-                          <span className="text-[var(--color-accent)]">{log.dog_name}</span> was scanned
-                        </p>
-                        <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-[var(--color-muted)]">
-                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {formatDate(log.scanned_at)} {formatTime(log.scanned_at)}</span>
-                          {log.match_confidence && (
-                            <span className="flex items-center gap-1 font-mono text-[var(--color-success)]">
-                              {(log.match_confidence * 100).toFixed(1)}% Match
-                            </span>
-                          )}
-                        </div>
-                        {(log.location_lat && log.location_lon) && (
-                          <p className="text-xs text-[var(--color-muted)] flex items-center gap-1 mt-1">
-                            <MapPin className="w-3 h-3" /> {log.location_lat.toFixed(4)}, {log.location_lon.toFixed(4)}
-                          </p>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              )}
+      {/* Quick Stats */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-12"
+      >
+        {[
+          { label: 'Registered Dogs', value: dogs.length, icon: PawPrint, color: 'accent' },
+          { label: 'Total Scans', value: logs.length, icon: ScanFace, color: 'accent-2' },
+          { label: 'Recent Activity', value: recentLogs.length > 0 ? formatDate(recentLogs[0].scanned_at) : '—', icon: BarChart2, color: 'success' },
+        ].map(({ label, value, icon: Icon, color }) => (
+          <div key={label} className="card p-5 flex items-center gap-4">
+            <div className={`w-10 h-10 rounded-xl bg-[var(--color-${color})]/10 border border-[var(--color-${color})]/20 flex items-center justify-center shrink-0`}>
+              <Icon className={`w-5 h-5 text-[var(--color-${color})]`} />
+            </div>
+            <div>
+              <p className="text-xs text-[var(--color-muted)] mb-0.5">{label}</p>
+              <p className="text-lg font-bold font-display">{value}</p>
             </div>
           </div>
-          
+        ))}
+      </motion.div>
+
+      {/* Dogs Section */}
+      <section className="mb-14">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold font-display flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-[var(--color-accent)]" /> Your Dogs
+          </h2>
+          {dogs.length > 0 && (
+            <Link href="/enroll" className="text-xs text-[var(--color-accent)] hover:underline flex items-center gap-1">
+              Add another <ArrowRight className="w-3 h-3" />
+            </Link>
+          )}
         </div>
-      </div>
-    </>
+
+        {dogs.length === 0 ? (
+          <div className="card border-dashed p-14 flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-[var(--color-surface-2)] flex items-center justify-center mb-4">
+              <PawPrint className="w-7 h-7 text-[var(--color-muted)] opacity-50" />
+            </div>
+            <h3 className="text-lg font-bold mb-2">No dogs registered yet</h3>
+            <p className="text-[var(--color-muted)] text-sm mb-6 max-w-xs">Secure your dog&apos;s identity by enrolling their unique nose print into the registry.</p>
+            <Link href="/enroll" className="btn-primary py-2.5 px-6 rounded-xl">Get Started</Link>
+          </div>
+        ) : (
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+          >
+            <AnimatePresence>
+              {dogs.map(dog => (
+                <motion.div
+                  key={dog.id}
+                  variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="card card-lift group relative overflow-hidden"
+                >
+                  {/* Dog photo */}
+                  <div className="w-full aspect-[4/3] bg-[var(--color-surface-2)] overflow-hidden">
+                    {dog.profile_photo_url ? (
+                      <img src={dog.profile_photo_url} alt={dog.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <PawPrint className="w-10 h-10 text-[var(--color-muted)] opacity-30" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dog info */}
+                  <div className="p-5">
+                    <div className="flex items-start justify-between mb-1">
+                      <h3 className="text-lg font-bold font-display truncate">{dog.name}</h3>
+                      <span className="badge badge-success ml-2 shrink-0">Active</span>
+                    </div>
+                    <p className="text-[var(--color-muted)] text-sm mb-1">{dog.breed || 'Unknown breed'}</p>
+                    {dog.age && <p className="text-[var(--color-muted)] text-xs">{dog.age} yrs · {dog.sex || 'Unknown sex'}</p>}
+                    <p className="text-[var(--color-muted)] text-xs mt-2 flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> Enrolled {formatDate(dog.created_at)}
+                    </p>
+                  </div>
+
+                  {/* Action overlay */}
+                  <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+                    <Link
+                      href={`/edit/${dog.id}`}
+                      className="w-8 h-8 rounded-lg bg-[var(--color-surface)]/90 backdrop-blur-sm border border-[var(--color-border)] flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-colors"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(dog.id, dog.name)}
+                      disabled={isDeleting === dog.id}
+                      className="w-8 h-8 rounded-lg bg-[var(--color-surface)]/90 backdrop-blur-sm border border-[var(--color-border)] flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-error)] hover:border-[var(--color-error)] transition-colors"
+                    >
+                      {isDeleting === dog.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </section>
+
+      {/* Scan Activity Section */}
+      <section>
+        <h2 className="text-xl font-bold font-display flex items-center gap-2 mb-6">
+          <Search className="w-5 h-5 text-[var(--color-accent-2)]" /> Scan Activity
+        </h2>
+
+        {logs.length === 0 ? (
+          <div className="card p-10 text-center">
+            <Clock className="w-8 h-8 text-[var(--color-muted)] mx-auto mb-3 opacity-30" />
+            <p className="text-[var(--color-muted)] text-sm">No scans logged yet. When someone scans a dog, it will appear here.</p>
+          </div>
+        ) : (
+          <div className="card divide-y divide-[var(--color-border)]">
+            <AnimatePresence>
+              {logs.map((log, idx) => (
+                <motion.div
+                  key={log.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.04 }}
+                  className="flex items-start gap-4 p-5 hover:bg-[var(--color-surface-2)] transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-[var(--color-accent-2)]/10 border border-[var(--color-accent-2)]/20 flex items-center justify-center shrink-0 mt-0.5">
+                    <ScanFace className="w-4 h-4 text-[var(--color-accent-2)]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">
+                      <span className="text-[var(--color-accent)]">{log.dog_name}</span>{' '}
+                      <span className="text-[var(--color-text-secondary)]">was scanned</span>
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 mt-1">
+                      <span className="text-xs text-[var(--color-muted)] flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {formatDate(log.scanned_at)} at {formatTime(log.scanned_at)}
+                      </span>
+                      {log.match_confidence && (
+                        <span className="badge badge-success">{(log.match_confidence * 100).toFixed(1)}% match</span>
+                      )}
+                      {log.location_lat && log.location_lon && (
+                        <span className="text-xs text-[var(--color-muted)] flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {log.location_lat.toFixed(3)}, {log.location_lon.toFixed(3)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </section>
+    </div>
   )
 }
