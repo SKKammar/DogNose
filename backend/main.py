@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting DogNose backend...")
     
     # Task 2.6 Log match threshold
-    threshold = os.getenv("MATCH_THRESHOLD", "0.62")
+    threshold = os.getenv("MATCH_THRESHOLD", "0.56")
     logger.info(f"Match threshold: {threshold}")
     
     init_models()

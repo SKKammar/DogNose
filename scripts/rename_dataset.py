@@ -1,3 +1,4 @@
+# Local-only script: update these paths if you move the project.
 import os
 from pathlib import Path
 

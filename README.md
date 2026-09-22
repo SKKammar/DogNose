@@ -98,6 +98,8 @@ The frontend will be available at `http://localhost:3000`.
 - `USE_FINETUNED`: Enable fine-tuned model (Default: `true`).
 - `ENABLE_CLAHE`: Enable/disable CLAHE preprocessing (Default: `false`).
 - `DB_SCHEMA`: The Postgres schema used (Default: `dognose`).
+- `MAX_FILE_SIZE_MB`: Max file size for uploads in MB (Default: `10`).
+- `ALLOWED_UPLOAD_TYPES`: Allowed file extensions for uploads (Default: `image/jpeg,image/png,image/webp`).
 
 ---
 

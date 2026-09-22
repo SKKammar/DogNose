@@ -47,25 +47,19 @@ def _load_embedder():
     if _embedder_model is None:
         logger.info(f"Loading embedder model: {MODEL_HF_ID} ...")
         
-        # PyTorch 2.6+ defaults weights_only=True, blocking legacy numpy objects in checkpoint
-        orig_load = torch.load
-        def _compat_load(*args, **kwargs):
-            if "weights_only" in kwargs:
-                kwargs["weights_only"] = False
-            return orig_load(*args, **kwargs)
-
-        try:
-            torch.load = _compat_load
-            use_finetuned = os.getenv("USE_FINETUNED", "true").lower() == "true"
-            if use_finetuned:
-                from embedder import NoseEmbedder
-                model_path = os.getenv("EMBEDDER_MODEL_PATH", r"Z:\Santu\IntelliJ\DoGNose\models\dognose_megadescriptor_finetuned.pth")
-                _embedder_model = NoseEmbedder(model_path)
-            else:
-                _embedder_model = timm.create_model(MODEL_HF_ID, num_classes=0, pretrained=True)
-                _embedder_model.eval()
-        finally:
-            torch.load = orig_load
+        use_finetuned = os.getenv("USE_FINETUNED", "true").lower() == "true"
+        if use_finetuned:
+            from embedder import NoseEmbedder
+            model_path = os.getenv("EMBEDDER_MODEL_PATH")
+            if not model_path:
+                raise RuntimeError(
+                    "EMBEDDER_MODEL_PATH is not set. "
+                    "Set it in backend/.env to the absolute path of dognose_megadescriptor_finetuned.pth."
+                )
+            _embedder_model = NoseEmbedder(model_path)
+        else:
+            _embedder_model = timm.create_model(MODEL_HF_ID, num_classes=0, pretrained=True)
+            _embedder_model.eval()
 
 
         _embedder_transforms = T.Compose([

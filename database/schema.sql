@@ -1,183 +1,114 @@
--- =============================================================================
--- DogNose (CANID) — Complete Database Schema
--- =============================================================================
--- Run this ENTIRE file in your Supabase Dashboard → SQL Editor → New Query → Run
--- This creates all tables, indexes, RLS policies, and match functions.
--- =============================================================================
+-- DogNose Database Schema
+-- Run on a fresh Supabase project to set up the full schema.
+-- Requires pgvector extension to be enabled first.
 
--- 1. Enable required extensions
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- 2. Create dogs table
-CREATE TABLE IF NOT EXISTS dogs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    breed TEXT,
-    age NUMERIC,
-    sex TEXT,
-    color_markings TEXT,
-    owner_name TEXT,
-    owner_phone TEXT,
-    owner_email TEXT,
-    microchip_id TEXT,
-    notes TEXT,
-    embedding vector(1536),
-    embedding_version TEXT DEFAULT 'megadescriptor-v1',
-    is_lost BOOLEAN NOT NULL DEFAULT false,
-    lost_since TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+CREATE SCHEMA IF NOT EXISTS dognose;
+
+GRANT USAGE ON SCHEMA dognose TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA dognose TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA dognose TO anon, authenticated, service_role;
+
+-- Table: dognose.dogs
+CREATE TABLE dognose.dogs (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id             uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+    name                text NOT NULL,
+    breed               text,
+    age                 double precision,
+    sex                 text,
+    color_markings      text,
+    owner_name          text,
+    owner_phone         text,
+    owner_email         text,
+    profile_photo_url   text,
+    nose_embedding      vector(1536),
+    embedding_version   text DEFAULT 'dognose-v2-finetuned',
+    created_at          timestamptz DEFAULT now()
 );
 
--- 3. Create pgvector index for fast cosine similarity search
-CREATE INDEX IF NOT EXISTS dogs_embedding_idx
-    ON dogs USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX dogs_embedding_idx
+    ON dognose.dogs
+    USING hnsw (nose_embedding vector_cosine_ops);
 
--- =============================================================================
--- 4. Row Level Security
--- =============================================================================
+ALTER TABLE dognose.dogs ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE dogs ENABLE ROW LEVEL SECURITY;
-
--- Dogs: users can only manage their own dogs
 CREATE POLICY "Users can view their own dogs"
-    ON dogs FOR SELECT
-    USING (auth.uid() = owner);
+    ON dognose.dogs FOR SELECT
+    USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert their own dogs"
-    ON dogs FOR INSERT
-    WITH CHECK (auth.uid() = owner);
+    ON dognose.dogs FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own dogs"
-    ON dogs FOR UPDATE
-    USING (auth.uid() = owner)
-    WITH CHECK (auth.uid() = owner);
+    ON dognose.dogs FOR UPDATE
+    USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete their own dogs"
-    ON dogs FOR DELETE
-    USING (auth.uid() = owner);
+    ON dognose.dogs FOR DELETE
+    USING (auth.uid() = user_id);
 
--- =============================================================================
--- 5. Match functions (SECURITY DEFINER — bypass RLS for server-side queries)
--- =============================================================================
+-- Table: dognose.scan_logs
+CREATE TABLE dognose.scan_logs (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    matched_dog_id      uuid REFERENCES dognose.dogs(id) ON DELETE SET NULL,
+    similarity_score    double precision,
+    scanner_ip_hash     text,
+    scanned_at          timestamptz DEFAULT now()
+);
 
--- Match ALL enrolled dogs (used by /dogs/identify endpoint)
-CREATE OR REPLACE FUNCTION public.match_all_dogs(
-    query_embedding vector(1536),
-    match_threshold float,
-    match_count int,
+ALTER TABLE dognose.scan_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role full access to scan_logs"
+    ON dognose.scan_logs FOR ALL
+    USING (true)
+    WITH CHECK (true);
+
+GRANT ALL ON dognose.scan_logs TO service_role;
+
+-- RPC: dognose.match_all_dogs
+DROP FUNCTION IF EXISTS dognose.match_all_dogs(vector, double precision, integer, text);
+
+CREATE OR REPLACE FUNCTION dognose.match_all_dogs(
+    query_embedding     vector,
+    match_threshold     double precision,
+    match_count         integer,
     p_embedding_version text
 )
 RETURNS TABLE (
-    dog_id UUID,
-    name TEXT,
-    breed TEXT,
-    age NUMERIC,
-    sex TEXT,
-    color_markings TEXT,
-    owner_name TEXT,
-    owner_phone TEXT,
-    owner_email TEXT,
-    similarity FLOAT
+    dog_id              uuid,
+    name                text,
+    breed               text,
+    age                 double precision,
+    sex                 text,
+    color_markings      text,
+    owner_name          text,
+    owner_phone         text,
+    owner_email         text,
+    profile_photo_url   text,
+    similarity          double precision
 )
-SECURITY DEFINER
-SET search_path = public
-LANGUAGE plpgsql
+LANGUAGE sql STABLE
 AS $$
-BEGIN
-    RETURN QUERY
-    WITH ranked_matches AS (
-        SELECT
-            d.id AS dog_id,
-            d.name,
-            d.breed,
-            d.age,
-            d.sex,
-            d.color_markings,
-            d.owner_name,
-            d.owner_phone,
-            d.owner_email,
-            1 - (d.embedding <=> query_embedding) AS similarity,
-            ROW_NUMBER() OVER (
-                PARTITION BY d.id
-                ORDER BY d.embedding <=> query_embedding ASC
-            ) AS rn
-        FROM dogs d
-        WHERE d.embedding IS NOT NULL
-          AND d.embedding_version = p_embedding_version
-          AND 1 - (d.embedding <=> query_embedding) >= match_threshold
-    )
     SELECT
-        rm.dog_id,
-        rm.name,
-        rm.breed,
-        rm.age,
-        rm.sex,
-        rm.color_markings,
-        rm.owner_name,
-        rm.owner_phone,
-        rm.owner_email,
-        rm.similarity
-    FROM ranked_matches rm
-    WHERE rm.rn = 1
-    ORDER BY rm.similarity DESC
+        id              AS dog_id,
+        name,
+        breed,
+        age,
+        sex,
+        color_markings,
+        owner_name,
+        owner_phone,
+        owner_email,
+        profile_photo_url,
+        1 - (nose_embedding <=> query_embedding) AS similarity
+    FROM dognose.dogs
+    WHERE
+        embedding_version = p_embedding_version
+        AND nose_embedding IS NOT NULL
+        AND 1 - (nose_embedding <=> query_embedding) > match_threshold
+    ORDER BY nose_embedding <=> query_embedding
     LIMIT match_count;
-END;
 $$;
-
-GRANT EXECUTE ON FUNCTION public.match_all_dogs(vector(1536), float, int, text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.match_all_dogs(vector(1536), float, int, text) TO anon;
-
--- Match only LOST dogs (used by the lost-dog finder feature)
-CREATE OR REPLACE FUNCTION public.match_lost_dogs(
-    query_embedding vector(1536),
-    match_threshold float,
-    match_count int,
-    p_embedding_version text
-)
-RETURNS TABLE (
-    dog_id UUID,
-    name TEXT,
-    breed TEXT,
-    confidence FLOAT
-)
-SECURITY DEFINER
-SET search_path = public
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    RETURN QUERY
-    WITH matches AS (
-        SELECT
-            d.id AS dog_id,
-            d.name,
-            d.breed,
-            1 - (d.embedding <=> query_embedding) AS confidence
-        FROM dogs d
-        WHERE d.is_lost = true
-          AND d.embedding IS NOT NULL
-          AND d.embedding_version = p_embedding_version
-          AND 1 - (d.embedding <=> query_embedding) >= match_threshold
-    ),
-    best_matches AS (
-        SELECT
-            m.dog_id,
-            m.name,
-            m.breed,
-            MAX(m.confidence) AS confidence
-        FROM matches m
-        GROUP BY m.dog_id, m.name, m.breed
-    )
-    SELECT
-        bm.dog_id,
-        bm.name,
-        bm.breed,
-        bm.confidence
-    FROM best_matches bm
-    ORDER BY bm.confidence DESC
-    LIMIT match_count;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.match_lost_dogs(vector(1536), float, int, text) TO anon;
-GRANT EXECUTE ON FUNCTION public.match_lost_dogs(vector(1536), float, int, text) TO service_role;
