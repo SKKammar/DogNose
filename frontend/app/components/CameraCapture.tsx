@@ -13,14 +13,15 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
   const canvasRef = useRef<HTMLCanvasElement>(null)
   
   const [stream, setStream] = useState<MediaStream | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<'camera' | 'upload'>('camera')
   const [flash, setFlash] = useState(false)
   
   const startCamera = useCallback(async () => {
     try {
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop())
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
       }
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: { 
@@ -29,6 +30,7 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
           aspectRatio: { ideal: 0.75 } 
         }
       })
+      streamRef.current = newStream
       setStream(newStream)
       if (videoRef.current) {
         videoRef.current.srcObject = newStream
@@ -38,17 +40,16 @@ export default function CameraCapture({ onCapture, isScanning = false, remaining
       setError("Camera access denied.")
       setMode('upload')
     }
-  }, [stream])
+  }, [])
 
   useEffect(() => {
     if (mode === 'camera') {
       startCamera()
     }
     return () => {
-      if (stream) stream.getTracks().forEach(t => t.stop())
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- adding stream/startCamera causes infinite re-renders
-  }, [mode])
+  }, [mode, startCamera])
 
   const capture = useCallback(() => {
     if (mode === 'upload' || isScanning) return
