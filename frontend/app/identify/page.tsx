@@ -1,16 +1,27 @@
 'use client'
-import React, { useState, useEffect, useRef } from 'react'
-import CameraCapture from '../components/CameraCapture'
-import { Loader2, Phone, Mail, Copy, ScanFace, ArrowRight, Info, AlertTriangle, ChevronDown, PawPrint, Camera } from 'lucide-react'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
+import {
+  Phone, Copy, AlertTriangle, PawPrint, ChevronDown,
+  CheckCircle2, ScanLine,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import CameraCapture from '../components/CameraCapture'
+import NetworkError from '../components/NetworkError'
+import PipelineTerminal from '../components/PipelineTerminal'
 import { identifyNose, callWithWakeUp, API_URL } from '../../lib/api'
 import type { ApiError } from '../../lib/api'
-import NetworkError from '../components/NetworkError'
-import { toast } from 'sonner'
 
-type IdentifyStatus = 'idle' | 'processing' | 'match' | 'no_match' | 'validation_error' | 'error'
+type Status = 'idle' | 'processing' | 'match' | 'no_match' | 'validation_error' | 'error'
 
+interface HealthAllergy { allergen: string; severity?: 'mild' | 'moderate' | 'severe' | null }
+interface HealthInfo {
+  allergies: HealthAllergy[]
+  vaccination_status: 'up_to_date' | 'overdue' | 'unknown'
+  last_weight_kg: number | null
+}
 interface MatchCandidate {
   dog_id: string
   name: string
@@ -22,490 +33,408 @@ interface MatchCandidate {
   owner_phone?: string
   owner_email?: string
   profile_photo_url?: string
-  microchip_id?: string
   behaviour_notes?: string
   emergency_contact_name?: string
   emergency_contact_phone?: string
   vet_name?: string
   vet_phone?: string
   similarity: number
-  is_match: boolean
 }
-
-interface HealthAllergy {
-  allergen: string
-  severity?: 'mild' | 'moderate' | 'severe' | null
-}
-
-interface HealthInfo {
-  allergies: HealthAllergy[]
-  vaccination_status: 'up_to_date' | 'overdue' | 'unknown'
-  last_weight_kg: number | null
-}
-
-interface IdentifyResult {
+interface Result {
   match: boolean
   matched?: boolean
   message: string
   confidence?: number
-  confidence_pct?: string
   dog?: MatchCandidate
   health?: HealthInfo
   error?: boolean
   code?: string
 }
 
-const ERROR_MESSAGES: Record<string, { icon: string; title: string; hint: string }> = {
-  BLURRY: { icon: 'BLUR_ERR', title: 'Image resolution insufficient', hint: 'Camera must be held steady. Wait for autofocus lock before capture.' },
-  DARK: { icon: 'LUX_ERR', title: 'Ambient light insufficient', hint: 'Reposition subject into a brighter environment.' },
-  NOT_A_DOG: { icon: 'SUB_ERR', title: 'Subject unidentifiable', hint: 'Target must be clearly framed.' },
-  NO_NOSE: { icon: 'TGT_ERR', title: 'Biometric target lost', hint: 'Center the nose pattern inside the reticle.' },
-  NOSE_TOO_SMALL: { icon: 'DIST_ERR', title: 'Proximity warning', hint: 'Reduce distance to target. Maintain 15–20cm.' },
-  NO_MATCH: { icon: '404_ERR', title: 'Subject unknown', hint: 'Record not found in the central registry.' },
-  BAD_INPUT: { icon: 'FMT_ERR', title: 'Data corruption', hint: 'Data stream rejected. Use standard JPEG/PNG payload.' },
-  MODELS_LOADING: { icon: 'SYS_BOOT', title: 'Engine initializing', hint: 'Neural network cold-starting. Please hold.' },
+const ERRORS: Record<string, { icon: string; title: string; hint: string }> = {
+  BLURRY: { icon: '📸', title: 'Too blurry', hint: 'Hold steady and wait for the camera to focus.' },
+  DARK: { icon: '💡', title: 'Too dark', hint: 'Move somewhere with better light.' },
+  NOT_A_DOG: { icon: '🐾', title: 'No dog in frame', hint: 'Make sure the dog is clearly visible.' },
+  NO_NOSE: { icon: '👃', title: 'Nose not visible', hint: 'Point the camera at the nose from 15–25 cm away.' },
+  NOSE_TOO_SMALL: { icon: '🔍', title: 'Too far away', hint: 'Get closer — the nose should fill most of the frame.' },
+  BAD_INPUT: { icon: '⚠️', title: 'Invalid image', hint: 'Upload a JPEG, PNG, or WebP photo.' },
+  MODELS_LOADING: { icon: '⏳', title: 'Starting up', hint: 'The server is waking up. Try again in a moment.' },
 }
 
-const PROCESSING_STEPS_LABELS = ['ISOLATING BIOMETRIC TARGET', 'EXTRACTING SIGNATURE VECTORS', 'QUERYING GLOBAL REGISTRY']
-
 export default function IdentifyPage() {
-  const [status, setStatus] = useState<IdentifyStatus>('idle')
-  const [result, setResult] = useState<IdentifyResult | null>(null)
+  const [status, setStatus] = useState<Status>('idle')
+  const [result, setResult] = useState<Result | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
-  const [validationError, setValidationError] = useState<{ icon: string; title: string; hint: string } | null>(null)
-  const [processingStep, setProcessingStep] = useState(0)
-  const [isWaking, setIsWaking] = useState(false)
-  const [showReportModal, setShowReportModal] = useState(false)
-  const [stats, setStats] = useState({ registered_dogs: 0 })
-  const stepTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [vError, setVError] = useState<{ icon: string; title: string; hint: string } | null>(null)
+  const [step, setStep] = useState(0)
+  const [dogCount, setDogCount] = useState(0)
 
   useEffect(() => {
-    fetch(`${API_URL}/stats`).then(r => r.json()).then(d => setStats(d)).catch(() => {})
-    return () => { if (stepTimerRef.current) clearInterval(stepTimerRef.current) }
+    fetch(`${API_URL}/stats`).then((r) => r.json()).then((d) => setDogCount(d.registered_dogs || 0)).catch(() => {})
   }, [])
 
-  const handleCapture = async (blob: Blob | Blob[]) => {
-    const imageBlob = Array.isArray(blob) ? blob[0] : blob
-    setStatus('processing')
-    setProcessingStep(0)
+  useEffect(() => {
+    if (status !== 'processing') return
+    setStep(0)
+    const t = setInterval(() => setStep((s) => Math.min(s + 1, 2)), 1400)
+    return () => clearInterval(t)
+  }, [status])
+
+  const onCapture = async (blob: Blob | Blob[]) => {
+    const file = Array.isArray(blob) ? blob[0] : blob
     setResult(null)
     setError(null)
-    setValidationError(null)
-
-    stepTimerRef.current = setInterval(() => {
-      setProcessingStep(prev => Math.min(prev + 1, PROCESSING_STEPS_LABELS.length - 1))
-    }, 1800)
-
+    setVError(null)
+    setStatus('processing')
     try {
-      const data = await callWithWakeUp(() => identifyNose(imageBlob), setIsWaking)
-      if (stepTimerRef.current) clearInterval(stepTimerRef.current)
-
-      if (data.error && data.code) {
-        setValidationError(ERROR_MESSAGES[data.code] || { icon: 'ERR_UNKNOWN', title: 'System Exception', hint: data.message || 'Execution halted.' })
+      const data = await callWithWakeUp(() => identifyNose(file), () => {})
+      if (data.error) {
+        setVError(ERRORS[data.code] ?? { icon: '⚠️', title: 'Something went wrong', hint: data.message })
         setStatus('validation_error')
         return
       }
-
+      if (data.matched === false || data.match === false) {
+        setStatus('no_match')
+        return
+      }
       setResult(data)
-      setStatus(data.match || data.matched ? 'match' : 'no_match')
-    } catch (err: any) {
-      if (stepTimerRef.current) clearInterval(stepTimerRef.current)
-      setError(err)
+      setStatus('match')
+    } catch (e: any) {
+      setError(e)
       setStatus('error')
-    } finally {
-      setIsWaking(false)
     }
   }
 
-  const reset = async () => {
-    setStatus('idle'); setResult(null); setError(null); setValidationError(null); setProcessingStep(0); setIsWaking(false)
+  const reset = () => {
+    setStatus('idle')
+    setResult(null)
+    setError(null)
+    setVError(null)
   }
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text).then(() => toast.success(`${label} COPIED TO CLIPBOARD`))
-  }
-
-  const handleCopy = () => {
+  const copyAll = () => {
     if (!result?.dog) return
     const d = result.dog
     const h = result.health
-    const allergyLine = h?.allergies?.length
-      ? h.allergies
-          .map(a => `${a.allergen}${a.severity ? ` (${a.severity})` : ''}`)
-          .join(', ')
-      : null
     const lines = [
       `Dog: ${d.name}`,
       d.breed && `Breed: ${d.breed}`,
       d.age && `Age: ${d.age} yrs`,
       d.sex && `Sex: ${d.sex}`,
-      d.color_markings && `Colour: ${d.color_markings}`,
-      allergyLine && `Allergies: ${allergyLine}`,
+      h?.allergies?.length &&
+        `Allergies: ${h.allergies.map((a) => `${a.allergen}${a.severity ? ` (${a.severity})` : ''}`).join(', ')}`,
       d.behaviour_notes && `Behaviour: ${d.behaviour_notes}`,
       `Owner: ${d.owner_name || 'Unknown'}`,
       `Phone: ${d.owner_phone || 'N/A'}`,
       d.emergency_contact_phone &&
-        `Emergency: ${[d.emergency_contact_name, d.emergency_contact_phone]
-          .filter(Boolean)
-          .join(' ')}`,
-      d.vet_phone &&
-        `Vet: ${[d.vet_name, d.vet_phone].filter(Boolean).join(' ')}`,
+        `Emergency: ${[d.emergency_contact_name, d.emergency_contact_phone].filter(Boolean).join(' ')}`,
+      d.vet_phone && `Vet: ${[d.vet_name, d.vet_phone].filter(Boolean).join(' ')}`,
     ].filter(Boolean)
     navigator.clipboard.writeText(lines.join('\n'))
-    toast.success('Copied all details')
+    toast.success('Copied')
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center px-4 py-12">
-      <div className="w-full max-w-4xl">
+    <div className="max-w-md mx-auto px-6 py-12">
+      {/* Idle */}
+      {status === 'idle' && (
+        <>
+          <div className="mb-8 text-center">
+            <p className="font-mono text-xs uppercase tracking-wider text-text-muted mb-3">
+              Scan a dog
+            </p>
+            <h1 className="font-display text-2xl font-bold text-text-primary mb-2">
+              Point at the nose
+            </h1>
+            <p className="text-sm text-text-secondary">
+              Fill the oval. Hold steady for one second.
+            </p>
+          </div>
 
-        {/* Header */}
-        <div className="text-center mb-10 flex flex-col items-center border-b border-border pb-6">
-          <ScanFace className="w-8 h-8 text-text-primary mb-4" />
-          <h1 className="text-4xl md:text-5xl font-display font-bold uppercase tracking-tight text-text-primary mb-2">Biometric Scan</h1>
-          <p className="font-mono text-text-muted text-xs tracking-widest uppercase">
-            {stats.registered_dogs > 0
-              ? `LIVE REGISTRY: ${stats.registered_dogs} SUBJECTS`
-              : 'SYSTEM ONLINE // READY'}
-          </p>
-        </div>
+          <CameraCapture onCapture={onCapture} />
 
-        <AnimatePresence mode="wait">
-
-          {/* IDLE — Camera */}
-          {status === 'idle' && (
-            <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="w-full mb-6 relative">
-                <CameraCapture onCapture={handleCapture} remainingPhotos={1} />
-              </div>
-              <div className="bg-surface border border-border p-4 flex items-start gap-4">
-                <Info className="w-5 h-5 text-accent-blue shrink-0" />
-                <p className="font-mono text-xs text-text-muted leading-relaxed uppercase tracking-wider">
-                  Align target subject within reticle. Maintain 15–20cm distance. Ensure adequate lighting. System will auto-evaluate sharpness.
-                </p>
-              </div>
-            </motion.div>
-          )}
-
-          {/* PROCESSING */}
-          {status === 'processing' && (
-            <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center py-32 text-center border border-border bg-surface shadow-brutalist">
-              {isWaking ? (
-                <>
-                  <Loader2 className="w-12 h-12 animate-spin text-accent-blue mb-6" />
-                  <h2 className="text-2xl font-display font-bold uppercase tracking-wide text-text-primary mb-2">Engine Boot Sequence</h2>
-                  <p className="font-mono text-text-muted text-xs uppercase tracking-widest max-w-sm">Neural network cold-start in progress. Estimated time: 30s.</p>
-                </>
-              ) : (
-                <>
-                  <div className="relative w-24 h-24 mb-10">
-                    <div className="absolute inset-0 rounded-none border border-accent-blue/30 animate-ping" />
-                    <div className="w-24 h-24 bg-background border border-accent-blue flex items-center justify-center">
-                      <ScanFace className="w-10 h-10 text-accent-blue" />
-                    </div>
-                  </div>
-                  <div className="space-y-4 w-full max-w-md text-left px-8">
-                    {PROCESSING_STEPS_LABELS.map((label, idx) => (
-                      <div key={label} className={`flex items-center gap-4 py-2 border-b border-border ${idx === processingStep ? 'opacity-100' : idx < processingStep ? 'opacity-40' : 'opacity-20'}`}>
-                        {idx < processingStep ? (
-                          <span className="font-mono text-accent-green font-bold text-sm">[OK]</span>
-                        ) : idx === processingStep ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-accent-blue shrink-0" />
-                        ) : (
-                          <span className="font-mono text-text-muted text-sm">[--]</span>
-                        )}
-                        <span className={`font-mono text-xs tracking-wider ${idx === processingStep ? 'text-text-primary' : 'text-text-muted'}`}>
-                          {idx === 2 ? `QUERYING ${stats.registered_dogs || '...'} RECORDS` : label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </motion.div>
-          )}
-
-          {/* MATCH */}
-          {status === 'match' && result?.dog && (
-  <motion.div
-    key="match"
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="w-full max-w-md mx-auto relative z-10"
-  >
-    {/* Top status bar */}
-    <div className="flex items-center justify-between mb-4 px-1">
-      <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-accent-green" />
-        <span className="text-xs font-mono uppercase tracking-wider text-accent-green font-bold">
-          Match found
-        </span>
-      </div>
-      {typeof result.dog.similarity === 'number' && (
-        <span className="text-[11px] font-mono uppercase tracking-wider text-text-muted">
-          {Math.round(result.dog.similarity * 100)}%
-        </span>
+          <div className="mt-6 card p-4">
+            <p className="text-xs font-mono uppercase tracking-wider text-text-muted mb-3">
+              Tips
+            </p>
+            <ul className="text-sm text-text-secondary space-y-2">
+              <li>· Hold the phone 15–25 cm from the nose</li>
+              <li>· Face the nose toward the light</li>
+              <li>· If the nose is dirty, wipe it gently</li>
+            </ul>
+          </div>
+        </>
       )}
-    </div>
 
-    <div className="bg-surface border border-border rounded overflow-hidden">
-      {/* Hero — photo + basics */}
-      <div className="p-6 flex gap-5 items-start border-b border-border">
-        <div className="w-24 h-24 rounded overflow-hidden bg-background border border-border shrink-0 flex items-center justify-center">
-          {result.dog.profile_photo_url ? (
-            <img
-              src={result.dog.profile_photo_url}
-              alt={result.dog.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <PawPrint className="w-8 h-8 text-text-muted" />
-          )}
+      {/* Processing */}
+      {status === 'processing' && (
+        <div className="py-24">
+          <PipelineTerminal />
         </div>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-3xl font-display font-bold text-text-primary leading-none mb-2">
-            {result.dog.name}
-          </h2>
-          <p className="text-sm text-text-secondary mb-1">
-            {[result.dog.breed, result.dog.age && `${result.dog.age} yrs`, result.dog.sex]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-          {result.dog.color_markings && (
-            <p className="text-xs text-text-muted">{result.dog.color_markings}</p>
-          )}
-        </div>
-      </div>
+      )}
 
-      {/* Health flags */}
-      {result.health &&
-        (result.health.allergies.length > 0 ||
-          result.health.vaccination_status !== 'unknown' ||
-          result.health.last_weight_kg != null) && (
-          <div className="p-6 border-b border-border space-y-3">
-            <p className="field-label">Take care</p>
+      {/* Match */}
+      {status === 'match' && result?.dog && (
+        <div className="animate-fade-in w-full max-w-md mx-auto">
+          <div className="flex items-center justify-between mb-4 px-1">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-success animate-pulse-slow" />
+              <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-success">
+                Identity Confirmed
+              </span>
+            </div>
+            <span className="text-[11px] sm:text-xs font-mono font-bold text-text-primary bg-surface-raised px-2 py-1 rounded-md border border-border shadow-sm">
+              {Math.round(result.dog.similarity * 100)}% MATCH
+            </span>
+          </div>
 
-            {result.health.allergies.map((a, i) => {
-              const severe = a.severity === 'severe'
-              const moderate = a.severity === 'moderate'
-              const tone = severe
-                ? 'bg-accent-red text-background border-accent-red'
-                : moderate
-                ? 'bg-[#FBBF24] text-background border-[#FBBF24]'
-                : 'bg-surface text-text-secondary border-border'
-              return (
-                <div
-                  key={i}
-                  className={`flex items-center gap-3 px-4 py-3 rounded border font-mono text-xs font-bold uppercase tracking-tight overflow-hidden ${tone}`}
-                >
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span className="shrink-0">
-                    {severe ? 'Severe allergy' : moderate ? 'Allergy' : 'Mild allergy'}
+          <div className="card overflow-hidden border-border-strong shadow-md">
+            
+            {/* --- HERO DOSSIER (Stagger 1) --- */}
+            <div className="relative p-4 sm:p-5 flex gap-4 items-start border-b border-border bg-surface animate-slide-up overflow-hidden" style={{ animationDelay: '0ms' }}>
+              <div className="absolute right-0 top-0 bottom-0 w-32 opacity-[0.04]" style={{
+                  backgroundImage: `linear-gradient(to right, #0F172A 1px, transparent 1px), linear-gradient(to bottom, #0F172A 1px, transparent 1px)`,
+                  backgroundSize: '12px 12px'
+              }}/>
+              
+              <div className="relative w-20 h-20 sm:w-24 sm:h-24 p-1 rounded-sm border border-border bg-background flex items-center justify-center shrink-0 z-10 shadow-sm">
+                <div className="absolute -top-px -left-px w-2 h-2 border-t-2 border-l-2 border-text-muted" />
+                <div className="absolute -bottom-px -right-px w-2 h-2 border-b-2 border-r-2 border-text-muted" />
+                {result.dog.profile_photo_url ? (
+                  <img src={result.dog.profile_photo_url} alt={result.dog.name} className="w-full h-full object-cover rounded-sm grayscale-[10%] contrast-125" />
+                ) : (
+                  <PawPrint className="w-8 h-8 text-text-muted" />
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0 z-10">
+                <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                  <h2 className="font-display text-2xl sm:text-3xl font-bold text-text-primary leading-none tracking-tight break-words">
+                    {result.dog.name}
+                  </h2>
+                  <span className="font-mono text-[9px] sm:text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 border border-accent text-accent bg-accent/5 rounded-sm">
+                    ID:{result.dog.dog_id?.slice(0, 6) || 'VERIFIED'}
                   </span>
-                  <span className="ml-auto truncate">{a.allergen}</span>
                 </div>
-              )
-            })}
+                
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-3">
+                  {result.dog.breed && (
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-text-secondary">Breed</p>
+                      <p className="text-sm text-text-primary font-semibold truncate">{result.dog.breed}</p>
+                    </div>
+                  )}
+                  {result.dog.sex && (
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-text-secondary">Sex</p>
+                      <p className="text-sm text-text-primary font-semibold truncate">{result.dog.sex}</p>
+                    </div>
+                  )}
+                  {result.dog.age && (
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-text-secondary">Age</p>
+                      <p className="text-sm text-text-primary font-semibold truncate">{result.dog.age} YRS</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* --- MEDICAL PROFILE (Stagger 2) --- */}
+            {result.health && (
+              (Array.isArray(result.health.allergies) && result.health.allergies.length > 0) || 
+              (result.health.vaccination_status && result.health.vaccination_status !== 'unknown') || 
+              (result.health.last_weight_kg !== null && result.health.last_weight_kg !== undefined)
+            ) && (
+              <div className="p-4 sm:p-5 border-b border-border space-y-4 animate-slide-up opacity-0" style={{ animationDelay: '100ms' }}>
+                <p className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-text-secondary">
+                   Medical Profile
+                </p>
 
-            <div className="flex flex-wrap gap-2">
-              {result.health.vaccination_status !== 'unknown' && (
-                <span
-                  className={`badge ${
-                    result.health.vaccination_status === 'overdue'
-                      ? 'bg-[#FBBF24] text-background'
-                      : 'bg-accent-green text-background'
-                  }`}
-                >
-                  {result.health.vaccination_status === 'overdue'
-                    ? 'Vaccines overdue'
-                    : 'Vaccines up to date'}
-                </span>
-              )}
-              {result.health.last_weight_kg != null && (
-                <span className="badge bg-surface text-text-secondary border border-border px-2 py-1">
-                  {result.health.last_weight_kg} kg
-                </span>
+                {result.health.allergies && result.health.allergies.length > 0 && (
+                  <div className="space-y-2.5">
+                    {result.health.allergies.map((a, i) => {
+                      const isSevere = a.severity === 'severe';
+                      const isMod = a.severity === 'moderate';
+                      
+                      // Stronger border opacity for higher contrast
+                      const tone = isSevere 
+                        ? 'bg-error/10 border-error/50 text-error' 
+                        : isMod 
+                          ? 'bg-warn/10 border-warn/50 text-warn-dark' // Assuming warn is amber
+                          : 'bg-surface-raised border-border-strong text-text-secondary';
+                      
+                      return (
+                        <div key={i} className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-3 py-3 rounded-md border text-sm font-mono ${tone}`}>
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <span className="uppercase tracking-wider font-extrabold text-xs sm:text-sm">
+                              {a.severity || 'Mild'} Allergy
+                            </span>
+                          </div>
+                          
+                          <div className="hidden sm:block flex-1 border-b border-dashed border-current opacity-30"></div>
+                          
+                          {/* Replaced truncate with break-words so long allergies wrap on phones */}
+                          <span className="font-semibold sm:text-right text-text-primary break-words bg-white/50 px-2 py-0.5 rounded-sm">
+                            {a.allergen}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2.5 pt-1">
+                  {result.health.vaccination_status !== 'unknown' && (
+                    <span className={`px-2.5 py-1.5 rounded-md font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider border ${result.health.vaccination_status === 'overdue' ? 'bg-warn/10 text-warn border-warn/30' : 'bg-success/10 text-success border-success/30'}`}>
+                      {result.health.vaccination_status === 'overdue' ? 'Vaccines Overdue' : 'Vaccines Up to Date'}
+                    </span>
+                  )}
+                  {result.health.last_weight_kg != null && (
+                    <span className="px-2.5 py-1.5 rounded-md font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider border border-border bg-surface-raised shadow-sm text-text-primary">
+                      <span className="text-text-secondary mr-1">WEIGHT:</span>
+                      {result.health.last_weight_kg} KG
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* --- BEHAVIOUR (Stagger 3) --- */}
+            {result.dog.behaviour_notes && (
+              <div className="p-4 sm:p-5 border-b border-border animate-slide-up opacity-0" style={{ animationDelay: '200ms' }}>
+                <p className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-text-secondary mb-2.5">
+                  Behaviour Notes
+                </p>
+                <p className="text-sm sm:text-base text-text-primary font-medium leading-relaxed bg-surface-raised p-3.5 rounded-md border border-border shadow-inner">
+                  {result.dog.behaviour_notes}
+                </p>
+              </div>
+            )}
+
+            {/* --- OWNER & CONTACT (Stagger 4) --- */}
+            <div className="p-4 sm:p-5 border-b border-border bg-surface-raised/50 animate-slide-up opacity-0" style={{ animationDelay: '300ms' }}>
+              <p className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-text-secondary mb-3">
+                Emergency Contact
+              </p>
+
+              <div className="border border-border-strong rounded-md bg-surface overflow-hidden shadow-sm">
+                <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-base font-extrabold text-text-primary truncate">
+                      {result.dog.owner_name || 'Registered Owner'}
+                    </p>
+                    <p className="text-xs sm:text-sm text-text-secondary font-mono font-medium mt-1 truncate">
+                      {result.dog.owner_phone || 'No primary phone'}
+                    </p>
+                  </div>
+                  {result.dog.owner_phone ? (
+                    <a href={`tel:${result.dog.owner_phone}`} className="btn-primary w-full sm:w-auto shrink-0 justify-center">
+                      <Phone className="w-4 h-4" /> Call Owner
+                    </a>
+                  ) : result.dog.emergency_contact_phone ? (
+                    <a href={`tel:${result.dog.emergency_contact_phone}`} className="btn-primary w-full sm:w-auto shrink-0 justify-center bg-warn hover:bg-warn/90 border-warn text-white">
+                      <Phone className="w-4 h-4" /> Call Backup
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+
+              {(result.dog.emergency_contact_phone || result.dog.vet_phone) && (
+                <details className="group mt-3 border border-border-strong rounded-md overflow-hidden bg-surface shadow-sm">
+                  <summary className="px-4 py-3.5 cursor-pointer flex items-center justify-between list-none hover:bg-surface-raised transition-colors">
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-text-primary font-bold">
+                      View Backup Contacts
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-text-primary group-open:rotate-180 transition-transform" />
+                  </summary>
+                  <div className="border-t border-border-strong divide-y divide-border bg-background">
+                    {result.dog.emergency_contact_phone && (
+                      <a href={`tel:${result.dog.emergency_contact_phone}`} className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-surface-raised transition-colors">
+                        <div className="min-w-0">
+                          <p className="text-[10px] sm:text-[11px] font-bold font-mono uppercase tracking-wider text-text-secondary mb-1">Emergency Contact</p>
+                          <p className="text-sm font-bold text-text-primary truncate">{result.dog.emergency_contact_name || 'Backup'}</p>
+                        </div>
+                        <Phone className="w-4 h-4 text-text-primary shrink-0" />
+                      </a>
+                    )}
+                    {result.dog.vet_phone && (
+                      <a href={`tel:${result.dog.vet_phone}`} className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-surface-raised transition-colors">
+                        <div className="min-w-0">
+                          <p className="text-[10px] sm:text-[11px] font-bold font-mono uppercase tracking-wider text-text-secondary mb-1">Veterinarian</p>
+                          <p className="text-sm font-bold text-text-primary truncate">{result.dog.vet_name || 'Vet Clinic'}</p>
+                        </div>
+                        <Phone className="w-4 h-4 text-text-primary shrink-0" />
+                      </a>
+                    )}
+                  </div>
+                </details>
               )}
             </div>
-          </div>
-        )}
 
-      {/* Behaviour */}
-      {result.dog.behaviour_notes && (
-        <div className="p-6 border-b border-border">
-          <p className="field-label">Behaviour</p>
-          <p className="text-sm text-text-secondary leading-relaxed line-clamp-3">
-            {result.dog.behaviour_notes}
-          </p>
+            {/* --- ACTIONS (Stagger 5) --- */}
+            <div className="p-4 sm:p-5 flex flex-col sm:flex-row gap-3 bg-surface animate-slide-up opacity-0" style={{ animationDelay: '400ms' }}>
+              <button onClick={copyAll} className="btn-secondary flex-1 py-3.5">
+                <Copy className="w-4 h-4" /> Copy details
+              </button>
+              <button onClick={reset} className="btn-primary flex-1 py-3.5 font-bold shadow-md">
+                Scan another dog
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Contact */}
-      <div className="p-6 border-b border-border">
-        <p className="field-label">Contact the owner</p>
-
-        <div className="border border-border rounded overflow-hidden mb-3">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 bg-background">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-text-primary truncate">
-                {result.dog.owner_name || 'Owner'}
-              </p>
-              <p className="text-xs text-text-muted font-mono mt-0.5">
-                {result.dog.owner_phone || 'No phone on file'}
-              </p>
+      {/* No match */}
+      {status === 'no_match' && (
+        <div className="fade-in card">
+          <div className="py-14 px-6 text-center">
+            <div className="w-14 h-14 mx-auto mb-5 rounded-full border border-border bg-surface-raised flex items-center justify-center">
+              <PawPrint className="w-6 h-6 text-text-muted" />
             </div>
-            {result.dog.owner_phone ? (
-              <a
-                href={`tel:${result.dog.owner_phone}`}
-                className="btn-primary text-xs px-4 py-2 shrink-0 flex items-center gap-1"
-              >
-                <Phone className="w-3.5 h-3.5" />
-                Call
-              </a>
-            ) : result.dog.emergency_contact_phone ? (
-              <a
-                href={`tel:${result.dog.emergency_contact_phone}`}
-                className="btn-primary text-xs px-4 py-2 shrink-0 flex items-center gap-1"
-              >
-                <Phone className="w-3.5 h-3.5" />
-                Emergency
-              </a>
-            ) : null}
+            <h2 className="font-display text-xl font-bold text-text-primary mb-2">
+              No match in the registry
+            </h2>
+            <p className="text-sm text-text-secondary max-w-xs mx-auto mb-6 leading-relaxed">
+              This dog isn&apos;t registered yet. You can still help find their owner.
+            </p>
+            <div className="flex flex-col gap-2 max-w-xs mx-auto">
+              <Link href="/enroll" className="btn-primary w-full">
+                Register this dog
+              </Link>
+              <button onClick={reset} className="btn-secondary w-full">
+                Try again
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        {(result.dog.emergency_contact_phone || result.dog.vet_phone) && (
-          <details className="group border border-border rounded overflow-hidden">
-            <summary className="px-4 py-3 cursor-pointer text-xs font-mono uppercase tracking-wider text-text-muted hover:text-text-primary transition-colors flex items-center justify-between list-none">
-              <span>Backup contacts</span>
-              <ChevronDown className="w-4 h-4 group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="border-t border-border divide-y divide-border">
-              {result.dog.emergency_contact_phone && (
-                <a
-                  href={`tel:${result.dog.emergency_contact_phone}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs uppercase tracking-wider text-text-muted font-mono mb-0.5">
-                      Emergency
-                    </p>
-                    <p className="text-sm text-text-primary truncate">
-                      {result.dog.emergency_contact_name || 'Emergency contact'}
-                    </p>
-                    <p className="text-xs text-text-muted font-mono">
-                      {result.dog.emergency_contact_phone}
-                    </p>
-                  </div>
-                  <Phone className="w-4 h-4 text-text-muted shrink-0" />
-                </a>
-              )}
-              {result.dog.vet_phone && (
-                <a
-                  href={`tel:${result.dog.vet_phone}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs uppercase tracking-wider text-text-muted font-mono mb-0.5">
-                      Vet
-                    </p>
-                    <p className="text-sm text-text-primary truncate">
-                      {result.dog.vet_name || 'Veterinarian'}
-                    </p>
-                    <p className="text-xs text-text-muted font-mono">
-                      {result.dog.vet_phone}
-                    </p>
-                  </div>
-                  <Phone className="w-4 h-4 text-text-muted shrink-0" />
-                </a>
-              )}
-            </div>
-          </details>
-        )}
-      </div>
+      {/* Validation error */}
+      {status === 'validation_error' && vError && (
+        <div className="fade-in card">
+          <div className="py-14 px-6 text-center">
+            <div className="text-4xl mb-5">{vError.icon}</div>
+            <h2 className="font-display text-xl font-bold text-text-primary mb-2">
+              {vError.title}
+            </h2>
+            <p className="text-sm text-text-secondary max-w-xs mx-auto mb-6 leading-relaxed">
+              {vError.hint}
+            </p>
+            <button onClick={reset} className="btn-primary">
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* Actions */}
-      <div className="p-6 flex flex-col gap-3 bg-background">
-        <button
-          onClick={handleCopy}
-          className="btn-ghost w-full justify-center flex items-center gap-2"
-        >
-          <Copy className="w-4 h-4" />
-          Copy all details
-        </button>
-        <button
-          onClick={reset}
-          className="btn-primary w-full justify-center flex items-center gap-2"
-        >
-          <Camera className="w-4 h-4" />
-          Scan another dog
-        </button>
-      </div>
-    </div>
-
-    <button
-      onClick={() => setShowReportModal(true)}
-      className="mt-4 w-full text-center text-xs text-text-muted underline hover:text-text-secondary transition-colors"
-    >
-      Report this match as incorrect
-    </button>
-  </motion.div>
-)}
-
-          {/* NO MATCH */}
-          {status === 'no_match' && (
-            <motion.div key="no_match" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full max-w-2xl mx-auto bg-surface border border-border shadow-brutalist">
-              <div className="p-8 border-b border-border flex items-center gap-4 bg-background">
-                <div className="w-12 h-12 bg-surface border border-text-muted flex items-center justify-center shrink-0">
-                  <span className="font-mono text-text-muted font-bold text-xl">!</span>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-display font-bold text-text-primary tracking-tight uppercase">No Subject Found</h2>
-                  <p className="font-mono text-xs text-text-muted tracking-widest mt-1">ERR_CODE: NO_MATCH</p>
-                </div>
-              </div>
-              <div className="p-8 flex flex-col gap-8">
-                <p className="font-sans text-text-secondary leading-relaxed">
-                  The biometric signature extracted from the image does not match any record in the current CANID registry.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 border-t border-border pt-8">
-                  <Link href="/enroll" className="btn-primary flex-1 py-3 justify-center text-sm tracking-wide">REGISTER SUBJECT</Link>
-                  <button onClick={reset} className="btn-ghost flex-1 py-3 justify-center text-sm tracking-wide">RETRY SCAN</button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* VALIDATION ERROR */}
-          {status === 'validation_error' && validationError && (
-            <motion.div key="val_error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full max-w-2xl mx-auto bg-surface border border-accent-red shadow-brutalist">
-              <div className="p-8 border-b border-border flex items-start gap-4">
-                <div className="w-12 h-12 bg-background border border-accent-red flex items-center justify-center shrink-0">
-                  <span className="font-mono text-accent-red font-bold text-xs uppercase">{validationError.icon.substring(0, 4)}</span>
-                </div>
-                <div>
-                  <h2 className="text-xl font-display font-bold text-text-primary tracking-tight uppercase">{validationError.title}</h2>
-                  <p className="font-mono text-xs text-accent-red tracking-widest mt-1 uppercase">ERR_CODE: {validationError.icon}</p>
-                </div>
-              </div>
-              <div className="p-8 flex flex-col gap-8">
-                <p className="font-sans text-text-secondary">{validationError.hint}</p>
-                <div className="border-t border-border pt-8">
-                  <button onClick={reset} className="w-full btn-ghost border-accent-red text-accent-red hover:bg-background py-3 justify-center text-sm tracking-wide">ACKNOWLEDGE & RETRY</button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* NETWORK ERROR */}
-          {status === 'error' && error && (
-            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <NetworkError error={error} onRetry={reset} />
-            </motion.div>
-          )}
-
-        </AnimatePresence>
-      </div>
+      {/* Network error */}
+      {status === 'error' && error && (
+        <div className="fade-in flex justify-center">
+          <NetworkError error={error} onRetry={reset} />
+        </div>
+      )}
     </div>
   )
 }

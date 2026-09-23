@@ -1,295 +1,236 @@
 'use client'
-import { useState, useEffect } from 'react'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { supabase } from '../../../lib/supabase'
 import { getDog, updateDog } from '../../../lib/api'
-import { Loader2, Save, X, Edit3, ChevronLeft } from 'lucide-react'
-import { toast } from 'sonner'
-import Link from 'next/link'
-import { motion } from 'framer-motion'
 import HealthRecordsPanel from '../../components/HealthRecordsPanel'
 
 export default function EditDogClient({ id }: { id: string }) {
   const router = useRouter()
+  const [tab, setTab] = useState<'profile' | 'health'>('profile')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<any>(null)
-  const [sessionToken, setSessionToken] = useState<string | null>(null)
-  const [dogName, setDogName] = useState('')
-  const [tab, setTab] = useState<'profile' | 'health'>('profile')
+  const [token, setToken] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [breed, setBreed] = useState('')
   const [age, setAge] = useState('')
   const [sex, setSex] = useState('Male')
-  const [colorMarkings, setColorMarkings] = useState('')
+  const [color, setColor] = useState('')
   const [ownerName, setOwnerName] = useState('')
   const [ownerPhone, setOwnerPhone] = useState('')
   const [ownerEmail, setOwnerEmail] = useState('')
-  const [microchipId, setMicrochipId] = useState('')
+  const [microchip, setMicrochip] = useState('')
   const [notes, setNotes] = useState('')
-  const [behaviourNotes, setBehaviourNotes] = useState('')
-  const [emergencyName, setEmergencyName] = useState('')
-  const [emergencyPhone, setEmergencyPhone] = useState('')
+  const [behaviour, setBehaviour] = useState('')
+  const [emName, setEmName] = useState('')
+  const [emPhone, setEmPhone] = useState('')
   const [vetName, setVetName] = useState('')
   const [vetPhone, setVetPhone] = useState('')
 
   useEffect(() => {
-    const fetchDog = async () => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+      setToken(session.access_token)
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) { router.push('/login'); return }
-        setSessionToken(session.access_token)
-        const dog = await getDog(id, session.access_token)
-        setName(dog.name || ''); setDogName(dog.name || '')
-        setBreed(dog.breed || ''); setAge(dog.age !== null ? String(dog.age) : '')
-        setSex(dog.sex || 'Male'); setColorMarkings(dog.color_markings || '')
-        setOwnerName(dog.owner_name || ''); setOwnerPhone(dog.owner_phone || '')
-        setOwnerEmail(dog.owner_email || ''); setMicrochipId(dog.microchip_id || '')
-        setNotes(dog.notes || '')
-        setBehaviourNotes(dog.behaviour_notes || '')
-        setEmergencyName(dog.emergency_contact_name || '')
-        setEmergencyPhone(dog.emergency_contact_phone || '')
-        setVetName(dog.vet_name || '')
-        setVetPhone(dog.vet_phone || '')
-      } catch (err) {
-        setError(err)
-        toast.error('Failed to load dog profile')
+        const d = await getDog(id, session.access_token)
+        setName(d.name || '')
+        setBreed(d.breed || '')
+        setAge(d.age != null ? String(d.age) : '')
+        setSex(d.sex || 'Male')
+        setColor(d.color_markings || '')
+        setOwnerName(d.owner_name || '')
+        setOwnerPhone(d.owner_phone || '')
+        setOwnerEmail(d.owner_email || '')
+        setMicrochip(d.microchip_id || '')
+        setNotes(d.notes || '')
+        setBehaviour(d.behaviour_notes || '')
+        setEmName(d.emergency_contact_name || '')
+        setEmPhone(d.emergency_contact_phone || '')
+        setVetName(d.vet_name || '')
+        setVetPhone(d.vet_phone || '')
+      } catch {
+        toast.error("Couldn't load this dog")
       } finally {
         setLoading(false)
       }
-    }
-    fetchDog()
+    })()
   }, [id, router])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const save = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name || !sessionToken) return
+    if (!token) return
     setSaving(true)
     try {
       await updateDog(id, {
-        name, breed: breed || null, age: age === '' ? null : Number(age), sex,
-        color_markings: colorMarkings || null, owner_name: ownerName || null,
-        owner_phone: ownerPhone || null, owner_email: ownerEmail || null,
-        microchip_id: microchipId || null, notes: notes || null,
-        behaviour_notes: behaviourNotes || null,
-        emergency_contact_name: emergencyName || null,
-        emergency_contact_phone: emergencyPhone || null,
+        name,
+        breed: breed || null,
+        age: age === '' ? null : Number(age),
+        sex,
+        color_markings: color || null,
+        owner_name: ownerName || null,
+        owner_phone: ownerPhone || null,
+        owner_email: ownerEmail || null,
+        microchip_id: microchip || null,
+        notes: notes || null,
+        behaviour_notes: behaviour || null,
+        emergency_contact_name: emName || null,
+        emergency_contact_phone: emPhone || null,
         vet_name: vetName || null,
         vet_phone: vetPhone || null,
-      }, sessionToken)
-      toast.success('SYS_UPDATE_OK')
+      }, token)
+      toast.success('Saved')
       router.push('/dashboard')
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to update profile')
+    } catch {
+      toast.error("Couldn't save")
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-accent-blue" /></div>
-
-  if (error) return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
-      <h2 className="text-xl font-display font-bold text-accent-red uppercase tracking-wide mb-2">Data Retrieval Failed</h2>
-      <p className="font-mono text-text-muted mb-8 text-xs uppercase tracking-widest">ERR_CODE: READ_FAULT</p>
-      <Link href="/dashboard" className="btn-ghost py-3 px-8 text-sm tracking-widest uppercase">Return to Dashboard</Link>
-    </div>
-  )
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-12">
+        <div className="skeleton h-8 w-40 mb-8" />
+        <div className="skeleton h-96" />
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center px-4 py-12">
-      <div className="w-full max-w-2xl">
-        {/* Header */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-10 flex flex-col items-center text-center border-b border-border pb-6">
-          <Link href="/dashboard" className="font-mono text-xs text-text-muted hover:text-text-primary transition-colors flex items-center gap-2 uppercase tracking-widest mb-6">
-            <ChevronLeft className="w-3 h-3" /> ABORT EDIT
-          </Link>
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 bg-background border border-border flex items-center justify-center">
-              <Edit3 className="w-5 h-5 text-accent-blue" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-display font-bold uppercase tracking-tight text-text-primary">Modify Subject</h1>
-              <p className="font-mono text-xs text-text-muted uppercase tracking-widest mt-2">ID_REF: {dogName}</p>
-            </div>
-          </div>
-        </motion.div>
+    <div className="max-w-2xl mx-auto px-6 py-12">
+      <Link href="/dashboard" className="text-sm text-text-muted hover:text-text-primary transition-colors">
+        ← Dashboard
+      </Link>
+      <h1 className="font-display text-3xl font-bold text-text-primary mt-3 mb-8">
+        {name}
+      </h1>
 
-        {/* NEW: tab bar */}
-        <div className="flex gap-2 mb-6 border-b border-border">
-          {(['profile', 'health'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                tab === t
-                  ? 'border-accent-blue text-accent-blue'
-                  : 'border-transparent text-text-muted hover:text-text-primary'
-              }`}
-            >
-              {t === 'profile' ? 'Profile' : 'Health Records'}
-            </button>
-          ))}
-        </div>
+      <div className="flex gap-6 border-b border-border mb-8">
+        {(['profile', 'health'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`tab ${tab === t ? 'tab-active' : ''}`}
+          >
+            {t === 'profile' ? 'Profile' : 'Health'}
+          </button>
+        ))}
+      </div>
 
-        {tab === 'profile' && (
-        <motion.form initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} onSubmit={handleSubmit} className="space-y-6">
-
-          {/* Basic Info */}
-          <div className="bg-surface border border-border p-8 shadow-brutalist space-y-6">
-            <h3 className="text-xs font-mono font-bold text-text-muted uppercase tracking-widest border-b border-border pb-4">Subject Metadata</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className="field-label">Primary Identifier (Name) *</label>
-                <input required type="text" value={name} onChange={e => setName(e.target.value)} className="input-base" placeholder="e.g. Max" />
+      {tab === 'profile' && (
+        <form onSubmit={save} className="space-y-10">
+          <section>
+            <h3 className="font-display text-base font-bold text-text-primary mb-4">About the dog</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="field-label">Name</label>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
               <div>
-                <label className="field-label">Morphological Class (Breed)</label>
-                <input type="text" value={breed} onChange={e => setBreed(e.target.value)} className="input-base" placeholder="e.g. Golden Retriever" />
+                <label className="field-label">Breed</label>
+                <input className="input" value={breed} onChange={(e) => setBreed(e.target.value)} />
               </div>
               <div>
-                <label className="field-label">Age (Years)</label>
-                <input type="number" step="0.1" min="0" value={age} onChange={e => setAge(e.target.value)} className="input-base" placeholder="e.g. 2.5" />
+                <label className="field-label">Age (years)</label>
+                <input className="input" type="number" step="0.1" min="0" value={age} onChange={(e) => setAge(e.target.value)} />
               </div>
               <div>
-                <label className="field-label">Biological Sex</label>
-                <select value={sex} onChange={e => setSex(e.target.value)} className="input-base appearance-none">
-                  <option value="Male">MALE</option>
-                  <option value="Female">FEMALE</option>
-                  <option value="Unknown">UNKNOWN</option>
+                <label className="field-label">Sex</label>
+                <select className="input" value={sex} onChange={(e) => setSex(e.target.value)}>
+                  <option>Male</option>
+                  <option>Female</option>
+                  <option>Unknown</option>
                 </select>
               </div>
-              <div className="md:col-span-2">
-                <label className="field-label">Phenotype (Color/Markings)</label>
-                <input type="text" value={colorMarkings} onChange={e => setColorMarkings(e.target.value)} className="input-base" placeholder="e.g. Fawn with black mask" />
+              <div>
+                <label className="field-label">Colour & markings</label>
+                <input className="input" value={color} onChange={(e) => setColor(e.target.value)} />
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Owner Contact */}
-          <div className="bg-surface border border-border p-8 shadow-brutalist space-y-6">
-            <h3 className="text-xs font-mono font-bold text-text-muted uppercase tracking-widest border-b border-border pb-4">Associated Contact</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="md:col-span-2">
-                <label className="field-label">Full Name</label>
-                <input type="text" value={ownerName} onChange={e => setOwnerName(e.target.value)} className="input-base" placeholder="e.g. Jane Doe" />
+          <section>
+            <h3 className="font-display text-base font-bold text-text-primary mb-4">Contact</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="field-label">Owner name</label>
+                <input className="input" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
               </div>
               <div>
-                <label className="field-label">Phone Coordinates</label>
-                <input type="tel" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} className="input-base" placeholder="+1 555-1234" />
+                <label className="field-label">Phone</label>
+                <input className="input" type="tel" value={ownerPhone} onChange={(e) => setOwnerPhone(e.target.value)} />
               </div>
               <div>
-                <label className="field-label">Email Coordinates</label>
-                <input type="email" value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} className="input-base" placeholder="jane@example.com" />
-              </div>
-            </div>
-          </div>
-
-          {/* Additional */}
-          <div className="bg-surface border border-border p-8 shadow-brutalist space-y-6">
-            <h3 className="text-xs font-mono font-bold text-text-muted uppercase tracking-widest border-b border-border pb-4">Supplementary Data</h3>
-            <div className="grid grid-cols-1 gap-5">
-              <div>
-                <label className="field-label">External Hardware ID (Microchip)</label>
-                <input type="text" value={microchipId} onChange={e => setMicrochipId(e.target.value)} className="input-base" placeholder="e.g. 985141002345678" />
+                <label className="field-label">Email</label>
+                <input className="input" type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} />
               </div>
               <div>
-                <label className="field-label">Notes</label>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="input-base resize-none" placeholder="Medical conditions, distinct behavior..." />
+                <label className="field-label">Emergency name</label>
+                <input className="input" value={emName} onChange={(e) => setEmName(e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Emergency phone</label>
+                <input className="input" type="tel" value={emPhone} onChange={(e) => setEmPhone(e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Vet name</label>
+                <input className="input" value={vetName} onChange={(e) => setVetName(e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Vet phone</label>
+                <input className="input" type="tel" value={vetPhone} onChange={(e) => setVetPhone(e.target.value)} />
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="bg-surface border border-border p-8 shadow-brutalist space-y-6 pt-4 mt-6">
-            <h3 className="text-xs font-mono font-bold text-text-muted uppercase tracking-widest border-b border-border pb-4">
-              Emergency &amp; Behaviour
-            </h3>
+          <section>
+            <h3 className="font-display text-base font-bold text-text-primary mb-4">Behaviour</h3>
+            <textarea
+              className="input"
+              rows={3}
+              value={behaviour}
+              onChange={(e) => setBehaviour(e.target.value)}
+              placeholder="Shown to anyone who finds your dog."
+            />
+          </section>
 
-            <div className="space-y-1">
-              <label className="field-label">Behaviour Notes</label>
-              <textarea
-                value={behaviourNotes}
-                onChange={e => setBehaviourNotes(e.target.value)}
-                rows={3}
-                className="input-base resize-none"
-                placeholder="e.g. Friendly, but nervous around loud noises. Do not let him off-leash."
-              />
-              <p className="text-xs text-text-muted">
-                Shown to anyone who finds your dog.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="field-label">Emergency Contact Name</label>
-                <input
-                  type="text"
-                  value={emergencyName}
-                  onChange={e => setEmergencyName(e.target.value)}
-                  className="input-base"
-                  placeholder="e.g. Michael Chen"
-                />
+          <section>
+            <h3 className="font-display text-base font-bold text-text-primary mb-4">Additional</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="field-label">Microchip ID</label>
+                <input className="input" value={microchip} onChange={(e) => setMicrochip(e.target.value)} />
               </div>
-              <div className="space-y-1">
-                <label className="field-label">Emergency Phone</label>
-                <input
-                  type="tel"
-                  value={emergencyPhone}
-                  onChange={e => setEmergencyPhone(e.target.value)}
-                  className="input-base"
-                  placeholder="+1 (555) 987-6543"
-                />
+              <div>
+                <label className="field-label">Private notes</label>
+                <textarea className="input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+                <p className="field-hint">Only you can see these.</p>
               </div>
             </div>
+          </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="field-label">Vet Name</label>
-                <input
-                  type="text"
-                  value={vetName}
-                  onChange={e => setVetName(e.target.value)}
-                  className="input-base"
-                  placeholder="e.g. Riverside Animal Hospital"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="field-label">Vet Phone</label>
-                <input
-                  type="tel"
-                  value={vetPhone}
-                  onChange={e => setVetPhone(e.target.value)}
-                  className="input-base"
-                  placeholder="+1 (555) 222-3333"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
-            <Link href="/dashboard" className="btn-ghost flex-1 py-4 justify-center text-sm tracking-widest uppercase">
-              ABORT
-            </Link>
-            <button disabled={!name || saving} type="submit" className="btn-primary flex-1 py-4 justify-center text-sm tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed">
-              {saving ? <Loader2 className="w-5 h-5 animate-spin mr-2 inline-block" /> : null}
-              {saving ? 'WRITING DATA...' : 'COMMIT CHANGES'}
+          <div className="flex gap-3 justify-end pt-4 border-t border-border">
+            <Link href="/dashboard" className="btn-ghost">Cancel</Link>
+            <button type="submit" disabled={saving} className="btn-primary">
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {saving ? 'Saving…' : 'Save changes'}
             </button>
           </div>
-        </motion.form>
-        )}
+        </form>
+      )}
 
-        {tab === 'health' && (
-          !sessionToken ? (
-            <div className="flex justify-center p-12">
-              <Loader2 className="w-8 h-8 animate-spin text-accent-blue" />
-            </div>
-          ) : (
-            <HealthRecordsPanel dogId={id} token={sessionToken} />
-          )
-        )}
-      </div>
+      {tab === 'health' && token && (
+        <HealthRecordsPanel dogId={id} token={token} />
+      )}
     </div>
   )
 }

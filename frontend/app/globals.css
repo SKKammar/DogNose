@@ -6,116 +6,251 @@
   box-sizing: border-box;
 }
 
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #F8FAFC;
+}
+
 body {
-  color: theme('colors.text.primary');
-  background: theme('colors.background');
-  font-family: theme('fontFamily.sans');
+  color: #0F172A;
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent; 
+  
+  /* Respect mobile notches and dynamic islands */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: theme('fontFamily.display');
-  letter-spacing: -0.02em;
+/* Lively text selection */
+::selection {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #0F172A;
 }
 
-/* Base Inputs */
+/* Light mode scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Optimistic, bright mesh gradient */
+/* Subtle warm depth + Matte display noise */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(59, 130, 246, 0.04), transparent 55%),
+    radial-gradient(circle at 85% 100%, rgba(16, 185, 129, 0.03), transparent 55%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.015'/%3E%3C/svg%3E");
+}
+
+main, nav, footer, aside { position: relative; z-index: 1; }
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display), system-ui, sans-serif;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+  margin: 0;
+}
+
+h1 { font-size: 40px; line-height: 1.1; }
+h2 { font-size: 24px; line-height: 1.2; }
+h3 { font-size: 18px; line-height: 1.3; }
+h4 { font-size: 15px; line-height: 1.4; }
+
+p { margin: 0; }
+
 @layer components {
-  .input-base {
-    @apply w-full bg-background border border-border rounded px-4 py-3 text-text-primary font-sans text-sm outline-none transition-colors;
+  /* -------- Buttons -------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2
+           font-medium text-sm px-5 py-3 rounded-md
+           border transition-all duration-200 ease-out
+           outline-none cursor-pointer select-none whitespace-nowrap;
   }
-  .input-base:focus {
-    @apply border-accent-blue outline outline-2 outline-offset-2 outline-accent-blue;
+  .btn:active:not(:disabled) {
+    @apply scale-[0.98];
   }
-  /* No soft glow shadows, just solid border */
-  .input-base::placeholder {
-    @apply text-text-muted;
+  .btn:focus-visible, .input:focus-visible, .btn-icon:focus-visible {
+    @apply outline-none ring-2 ring-accent/40 ring-offset-2 ring-offset-background;
   }
-
-  /* Cards */
-  .card {
-    @apply bg-surface border border-border rounded p-6 shadow-none transition-all;
-  }
-  /* If elevation is needed, use brutalist shadow, never soft dropshadows */
-  .card-elevated {
-    @apply bg-surface border border-border rounded p-6 shadow-brutalist;
+  .btn:disabled {
+    @apply opacity-40 cursor-not-allowed border-transparent bg-surface-raised text-text-muted;
   }
 
-  /* Buttons */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 bg-accent-blue text-background font-sans font-semibold px-6 py-3 rounded transition-colors border border-transparent;
+    @apply btn bg-accent text-white border-accent shadow-sm shadow-accent/20;
   }
-  .btn-primary:hover {
-    @apply bg-accent-blue opacity-90;
-  }
-  .btn-primary:active {
-    @apply bg-accent-blue opacity-90;
-  }
-  .btn-primary:disabled {
-    @apply opacity-50 cursor-not-allowed;
+  .btn-primary:hover:not(:disabled) {
+    @apply bg-accent-hover border-accent-hover shadow-md shadow-accent/30;
   }
 
+  /* Hardened Buttons */
+  .btn-secondary {
+    /* Stronger borders and darker text by default */
+    @apply btn bg-surface text-text-primary border-border-strong font-bold shadow-sm;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    @apply bg-surface-raised border-text-secondary text-text-primary;
+  }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 bg-transparent text-text-primary font-sans font-semibold px-6 py-3 rounded border border-border transition-all;
+    @apply btn bg-transparent text-text-secondary border-transparent font-bold;
   }
-  .btn-ghost:hover {
-    @apply border-text-secondary bg-surface;
+  .btn-ghost:hover:not(:disabled) {
+    @apply text-text-primary bg-surface-raised border-border-strong;
   }
 
-  /* Field Labels */
+  .btn-danger {
+    @apply btn bg-error/10 text-error border-error/20;
+  }
+  .btn-danger:hover:not(:disabled) {
+    @apply bg-error border-error text-white shadow-sm shadow-error/20;
+  }
+
+  .btn-sm { @apply px-3 py-2 text-xs gap-1.5; }
+
+  .btn-icon {
+    @apply inline-flex items-center justify-center
+           w-9 h-9 rounded-md bg-transparent text-text-secondary
+           border border-transparent transition-all duration-200 ease-out;
+  }
+  .btn-icon:hover:not(:disabled) {
+    @apply bg-surface-raised border-border text-text-primary shadow-sm;
+  }
+  .btn-icon:active:not(:disabled) {
+    @apply scale-[0.95];
+  }
+
+  /* -------- Inputs -------- */
+  /* High-Contrast Inputs */
+  .input {
+    /* Thicker visual weight on inputs so they are never missed */
+    @apply w-full bg-surface text-text-primary font-medium text-sm
+           px-3 py-2.5 rounded-md border-2 border-border shadow-sm
+           transition-all duration-200 ease-out
+           placeholder:text-text-muted/70;
+  }
+  .input:hover:not(:focus):not(:disabled) {
+    @apply border-text-muted;
+  }
+  .input:focus {
+    @apply border-accent outline-none ring-2 ring-accent/30;
+  }
+  .input:disabled {
+    @apply opacity-50 cursor-not-allowed bg-surface-raised shadow-none;
+  }
+
   .field-label {
-    @apply block text-xs font-semibold uppercase tracking-[0.06em] text-text-muted mb-1.5;
+    /* Labels are now secondary text and bolded */
+    @apply block text-xs font-bold text-text-secondary mb-1.5 transition-colors uppercase tracking-wider;
+  }
+  .input:focus + .field-label, 
+  .input:focus-within ~ .field-label {
+    @apply text-accent;
   }
 
-  /* Badges - Solid (focal only) */
-  .badge-solid {
-    @apply inline-flex items-center gap-1 px-2 py-1 rounded font-mono text-xs font-bold uppercase tracking-tight text-background;
+  textarea.input {
+    @apply resize-none leading-relaxed;
   }
 
-  /* Badges - Outline (default for most UI) */
-  .badge-outline {
-    @apply inline-flex items-center gap-1 px-2 py-1 rounded font-mono text-xs font-bold uppercase tracking-tight bg-transparent border;
+  select.input {
+    @apply appearance-none pr-8 bg-no-repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-position: right 12px center;
   }
-  
-  .badge-outline-success { @apply badge-outline text-accent-green border-accent-green; }
-  .badge-outline-warn    { @apply badge-outline text-[#FBBF24] border-[#FBBF24]; }
-  .badge-outline-error   { @apply badge-outline text-accent-red border-accent-red; }
-  .badge-outline-accent  { @apply badge-outline text-accent-blue border-accent-blue; }
 
-  /* Scroll rows */
-  .scroll-row {
-    @apply flex gap-4 overflow-x-auto pb-4;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  .field-hint {
+    @apply text-xs text-text-muted mt-1.5;
   }
-  .scroll-row::-webkit-scrollbar { display: none; }
-  .scroll-row > * { scroll-snap-align: start; }
-  
-  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-border rounded-sm; }
-}
-
-/* Animations */
-@layer utilities {
-  .animate-scan {
-    animation: scan 2.5s linear infinite;
+  .field-error {
+    @apply text-xs text-error mt-1.5;
   }
-  /* Removed pulse-slow, no soft glows */
-}
 
-@keyframes scan {
-  0% { transform: translateY(-100%); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateY(100%); opacity: 0; }
-}
+  /* Sharper Structural Shadows for PC Monitors */
+  .card {
+    /* Drops the fuzzy shadow for a sharp, defined outline shadow */
+    @apply bg-surface border border-border rounded-md shadow-[0_3px_10px_rgba(2,6,23,0.06)];
+  }
 
-@media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  /* -------- Badges -------- */
+  /* High-Contrast Badges */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2 py-1 rounded-md
+           font-mono text-[11px] font-bold uppercase tracking-wider border;
+  }
+  .badge-neutral {
+    @apply badge bg-surface-raised text-text-primary border-border-strong;
+  }
+  .badge-accent {
+    @apply badge bg-accent/10 text-accent border-accent/40;
+  }
+  .badge-success {
+    @apply badge bg-success/10 text-success border-success/40;
+  }
+  .badge-warn {
+    @apply badge bg-warn/10 text-warn border-warn/40;
+  }
+  .badge-error {
+    @apply badge bg-error/10 text-error border-error/40;
+  }
+
+  /* -------- Dividers & Structure -------- */
+  .section-heading {
+    @apply flex items-baseline justify-between gap-4 mb-5;
+  }
+  .section-heading h2 {
+    @apply text-lg font-display font-bold text-text-primary tracking-tight;
+  }
+  .section-heading .meta {
+    @apply text-xs font-mono text-text-muted tabular-nums;
+  }
+  .divider {
+    @apply border-0 border-t border-border my-0;
+  }
+
+  /* -------- Skeleton -------- */
+  .skeleton {
+    @apply bg-surface-raised border border-border rounded-md;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.6) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton 1.6s ease-in-out infinite;
+  }
+
+  /* -------- Tabs -------- */
+  .tab {
+    @apply px-1 py-3 text-sm font-medium text-text-muted
+           border-b-2 border-transparent transition-colors duration-150
+           cursor-pointer bg-transparent;
+  }
+  .tab:hover {
+    @apply text-text-primary;
+  }
+  .tab-active {
+    @apply text-accent border-accent;
   }
 }

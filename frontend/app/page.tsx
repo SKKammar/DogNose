@@ -1,220 +1,167 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ScanFace, Camera, ShieldCheck, Smartphone, PawPrint } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { Camera, ScanLine, Heart } from 'lucide-react'
 import { API_URL } from '../lib/api'
-
-interface Stats {
-  registered_dogs: number
-  matches_made: number
-}
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0 }
-}
+import { supabase } from '../lib/supabase'
 
 export default function HomePage() {
-  const [stats, setStats] = useState<Stats>({ registered_dogs: 0, matches_made: 0 })
+  const [stats, setStats] = useState({ registered_dogs: 0, matches_made: 0 })
+  const [session, setSession] = useState<any>(null)
 
   useEffect(() => {
     fetch(`${API_URL}/stats`)
-      .then(r => r.json())
-      .then(d => setStats(d))
+      .then((r) => r.json())
+      .then(setStats)
       .catch(() => {})
+      
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
+    return () => sub.subscription.unsubscribe()
   }, [])
 
   return (
-    <div className="flex flex-col w-full">
+    <div className="max-w-5xl mx-auto px-6">
+      {/* Hero */}
+      <section className="py-24 md:py-32">
+        <p className="font-mono text-xs uppercase tracking-wider text-text-muted mb-6">
+          A nose print registry for dogs
+        </p>
+        <h1 className="font-display text-5xl md:text-6xl font-bold text-text-primary leading-[1.05] tracking-tight max-w-3xl mb-8">
+          Every dog has a nose print.
+          <br />
+          <span className="text-text-secondary">Now they have an identity.</span>
+        </h1>
+        <p className="text-base text-text-secondary max-w-xl mb-10 leading-relaxed">
+          Register your dog&apos;s nose print once. If they ever go missing, anyone
+          who finds them can scan their nose and reach you in seconds.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/identify" className="btn-primary">
+            Scan a dog
+          </Link>
+          <Link href="/enroll" className="btn-secondary">
+            Register your dog
+          </Link>
+        </div>
+      </section>
 
-      {/* HERO SECTION */}
-      <section className="w-full min-h-[90vh] flex flex-col justify-center border-b border-border bg-background pt-16">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          
-          {/* Hero Copy */}
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            transition={{ staggerChildren: 0.1 }}
-          >
-            <motion.div variants={fadeUp} className="mb-6">
-              <span className="font-mono text-xs font-bold uppercase tracking-widest text-accent-blue border border-accent-blue bg-accent-blue/5 px-3 py-1.5">
-                SYS_REGISTRY // ONLINE
-              </span>
-            </motion.div>
+      {/* Stats */}
+      <section className="border-t border-b border-border py-8 grid grid-cols-2 gap-8">
+        <div>
+          <p className="font-display text-3xl font-bold text-text-primary tabular-nums">
+            {stats.registered_dogs.toLocaleString()}
+          </p>
+          <p className="text-xs font-mono uppercase tracking-wider text-text-muted mt-1">
+            Dogs registered
+          </p>
+        </div>
+        <div>
+          <p className="font-display text-3xl font-bold text-text-primary tabular-nums">
+            {stats.matches_made.toLocaleString()}
+          </p>
+          <p className="text-xs font-mono uppercase tracking-wider text-text-muted mt-1">
+            Times matched
+          </p>
+        </div>
+      </section>
 
-            <motion.h1 variants={fadeUp} className="font-display text-5xl md:text-7xl lg:text-[5rem] font-bold text-text-primary mb-8 leading-[1.05] tracking-tight uppercase">
-              Absolute Biometric Certainty.
-            </motion.h1>
-
-            <motion.p variants={fadeUp} className="font-sans text-lg md:text-xl text-text-secondary leading-relaxed mb-10 max-w-xl">
-              Ground truth canine identification powered by edge-to-edge metric analysis. No chips, no tags. Every nose is a unique identifier.
-            </motion.p>
-
-            <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4">
-              <Link href="/identify" className="btn-primary py-4 px-8 uppercase tracking-widest text-sm shadow-none hover:shadow-brutalist flex items-center justify-center gap-3">
-                <ScanFace className="w-5 h-5" /> Initialize Scan
-              </Link>
-              <Link href="/enroll" className="btn-ghost py-4 px-8 uppercase tracking-widest text-sm hover:border-text-primary hover:bg-surface flex items-center justify-center gap-3">
-                <Camera className="w-5 h-5" /> Register Subject
-              </Link>
-            </motion.div>
-
-            {/* Quick System Stats */}
-            <motion.div variants={fadeUp} className="flex gap-12 mt-16 pt-8 border-t border-border">
-              <div className="flex flex-col gap-1">
-                <span className="font-display text-4xl font-bold text-text-primary">{stats.registered_dogs}</span>
-                <span className="font-mono text-xs text-text-muted uppercase tracking-widest">Active Subjects</span>
+      {/* How it works */}
+      <section className="py-20">
+        <h2 className="font-display text-2xl font-bold text-text-primary mb-12">
+          How it works
+        </h2>
+        <div className="grid md:grid-cols-3 gap-8">
+          {[
+            {
+              n: '01',
+              icon: Camera,
+              title: 'Scan the nose',
+              body: 'Take one clear photo of the dog\'s nose. Works on any phone.',
+            },
+            {
+              n: '02',
+              icon: ScanLine,
+              title: 'We find the match',
+              body: 'The nose print is compared against every registered dog in the registry.',
+            },
+            {
+              n: '03',
+              icon: Heart,
+              title: 'Reach the owner',
+              body: 'Get the owner\'s phone, health flags, and care notes — instantly.',
+            },
+          ].map((s) => (
+            <div key={s.n}>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="font-mono text-xs text-text-muted">{s.n}</span>
+                <s.icon className="w-4 h-4 text-accent" strokeWidth={1.75} />
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="font-display text-4xl font-bold text-text-primary">{stats.matches_made}</span>
-                <span className="font-mono text-xs text-text-muted uppercase tracking-widest">Confirmed Matches</span>
-              </div>
-            </motion.div>
-          </motion.div>
-
-          {/* Hero Visual Container */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
-            className="w-full aspect-[4/3] bg-surface border border-border flex flex-col items-center justify-center relative overflow-hidden"
-          >
-            {/* Technical Grid Background */}
-            <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(#1E2736 1px, transparent 1px), linear-gradient(90deg, #1E2736 1px, transparent 1px)', backgroundSize: '48px 48px' }}></div>
-            
-            <ScanFace className="w-16 h-16 text-border mb-4" />
-            <span className="font-mono text-xs text-text-muted tracking-widest uppercase">CAMERA_FEED_STANDBY</span>
-
-            {/* Decorative Corner Brackets */}
-            <div className="absolute top-8 left-8 w-8 h-8 border-t border-l border-border"></div>
-            <div className="absolute top-8 right-8 w-8 h-8 border-t border-r border-border"></div>
-            <div className="absolute bottom-8 left-8 w-8 h-8 border-b border-l border-border"></div>
-            <div className="absolute bottom-8 right-8 w-8 h-8 border-b border-r border-border"></div>
-          </motion.div>
-
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section className="w-full py-32 px-6 bg-surface border-b border-border">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            transition={{ staggerChildren: 0.1 }}
-            className="mb-20 max-w-2xl"
-          >
-            <motion.p variants={fadeUp} className="text-xs font-mono font-bold uppercase tracking-widest text-accent-blue mb-4">Protocol Sequence</motion.p>
-            <motion.h2 variants={fadeUp} className="text-4xl md:text-5xl font-display font-bold text-text-primary uppercase tracking-tight">Execution Pathway</motion.h2>
-          </motion.div>
-
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            transition={{ staggerChildren: 0.15 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-border"
-          >
-            {[
-              { icon: Camera, step: '01', title: 'Capture Data', desc: "Acquire a high-resolution image of the subject's nose from 15-20cm." },
-              { icon: ScanFace, step: '02', title: 'Extract Signature', desc: 'System isolates the biometric topology and generates a 1536-D vector.' },
-              { icon: PawPrint, step: '03', title: 'Query Registry', desc: "Vector is matched against the global database for positive identification." },
-            ].map(({ icon: Icon, step, title, desc }, idx) => (
-              <motion.div key={step} variants={fadeUp} className={`flex flex-col p-12 bg-background relative ${idx !== 2 ? 'border-b md:border-b-0 md:border-r border-border' : ''}`}>
-                <div className="flex items-center justify-between mb-8">
-                  <div className="w-12 h-12 bg-surface border border-border flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-accent-blue" />
-                  </div>
-                  <span className="font-mono text-sm font-bold text-text-muted">{step}</span>
-                </div>
-                <h3 className="text-xl font-display font-bold uppercase tracking-wide text-text-primary mb-3">{title}</h3>
-                <p className="font-sans text-text-secondary leading-relaxed text-sm">{desc}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* SYSTEM SPECS */}
-      <section className="w-full py-32 px-6 bg-background">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 grid grid-cols-1 lg:grid-cols-2 gap-20">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            transition={{ staggerChildren: 0.1 }}
-          >
-            <motion.p variants={fadeUp} className="text-xs font-mono font-bold uppercase tracking-widest text-text-muted mb-4">Architecture</motion.p>
-            <motion.h2 variants={fadeUp} className="text-4xl md:text-5xl font-display font-bold text-text-primary uppercase tracking-tight mb-8">Built for Velocity & Precision</motion.h2>
-            <motion.p variants={fadeUp} className="font-sans text-text-secondary leading-relaxed mb-8">
-              CANID relies on a state-of-the-art CNN architecture to detect canine facial landmarks and extract unalterable nose print topologies.
-            </motion.p>
-            <motion.div variants={fadeUp}>
-              <Link href="/identify" className="font-mono text-accent-blue text-sm uppercase tracking-widest hover:text-[#3B82F6] flex items-center gap-2">
-                TEST SYSTEM <span className="text-lg">→</span>
-              </Link>
-            </motion.div>
-          </motion.div>
-
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            transition={{ staggerChildren: 0.12 }}
-            className="flex flex-col gap-6"
-          >
-            {[
-              { icon: Smartphone, title: 'Zero Friction', desc: 'No app download required. Universal browser access.' },
-              { icon: ShieldCheck, title: 'Cryptographic Privacy', desc: "Owner coordinates remain opaque until a >95% biometric match is established." },
-            ].map(({ icon: Icon, title, desc }) => (
-              <motion.div key={title} variants={fadeUp} className="bg-surface border border-border p-8 flex gap-6 hover:border-text-secondary transition-colors">
-                <div className="w-12 h-12 bg-background border border-border flex items-center justify-center shrink-0">
-                  <Icon className="w-5 h-5 text-text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-display font-bold uppercase tracking-wide text-text-primary mb-2">{title}</h3>
-                  <p className="font-sans text-text-secondary text-sm leading-relaxed">{desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="w-full border-t border-border bg-surface py-12 px-6 mt-auto">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-8 bg-background border border-border flex items-center justify-center">
-              <PawPrint className="w-4 h-4 text-text-primary" />
+              <h3 className="font-display text-base font-bold text-text-primary mb-2">
+                {s.title}
+              </h3>
+              <p className="text-sm text-text-secondary leading-relaxed">{s.body}</p>
             </div>
-            <div className="flex flex-col">
-              <span className="font-display font-bold text-sm tracking-wide text-text-primary uppercase">CANID</span>
-              <span className="font-mono text-[10px] text-text-muted uppercase tracking-widest">Biometric Registry</span>
-            </div>
-          </div>
-          <div className="flex gap-8">
-            {[
-              { label: 'IDENTIFY', href: '/identify' },
-              { label: 'REGISTER', href: '/enroll' },
-              { label: 'DASHBOARD', href: '/dashboard' },
-              { label: 'GITHUB', href: 'https://github.com/SKKammar/DogNose', external: true },
-            ].map(l => (
-              <a
-                key={l.label}
-                href={l.href}
-                target={l.external ? '_blank' : undefined}
-                rel={l.external ? 'noopener noreferrer' : undefined}
-                className="font-mono text-xs text-text-muted hover:text-text-primary transition-colors uppercase tracking-widest"
-              >
-                {l.label}
-              </a>
-            ))}
-          </div>
+          ))}
         </div>
+      </section>
+
+      {/* What you get */}
+      <section className="border-t border-border py-20">
+        <h2 className="font-display text-2xl font-bold text-text-primary mb-12">
+          What a finder sees
+        </h2>
+        <div className="grid md:grid-cols-3 gap-px bg-border border border-border rounded-md overflow-hidden">
+          {[
+            {
+              title: 'Health alerts',
+              body: 'Severe allergies and overdue vaccines surface before anything else.',
+            },
+            {
+              title: 'Care notes',
+              body: 'Whether the dog is friendly, nervous, or shouldn\'t be approached.',
+            },
+            {
+              title: 'Direct contact',
+              body: 'The owner\'s phone with a single tap to call, plus backup contacts.',
+            },
+          ].map((f) => (
+            <div key={f.title} className="bg-surface p-8">
+              <h3 className="font-display text-base font-bold text-text-primary mb-2">
+                {f.title}
+              </h3>
+              <p className="text-sm text-text-secondary leading-relaxed">{f.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-border py-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div>
+          <p className="font-display font-bold text-text-primary mb-1">CANID</p>
+          <p className="text-xs text-text-muted max-w-xs leading-relaxed">
+            A learning project. Not a substitute for a microchip or a collar tag.
+          </p>
+        </div>
+        <nav className="flex flex-wrap gap-6 text-xs text-text-muted">
+          <Link href="/identify" className="hover:text-text-primary transition-colors">Scan</Link>
+          <Link href="/enroll" className="hover:text-text-primary transition-colors">Register</Link>
+          {session ? (
+            <Link href="/dashboard" className="hover:text-text-primary transition-colors">Dashboard</Link>
+          ) : (
+            <Link href="/login" className="hover:text-text-primary transition-colors">Log in</Link>
+          )}
+          <a
+            href="https://github.com/SKKammar/DogNose"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-text-primary transition-colors"
+          >
+            GitHub
+          </a>
+        </nav>
       </footer>
     </div>
   )

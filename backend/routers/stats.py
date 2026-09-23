@@ -1,6 +1,5 @@
 import logging
 
-from cachetools import TTLCache, cached
 from dependencies import get_service_supabase
 from fastapi import APIRouter
 
@@ -8,15 +7,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
-# Cache for 60 seconds (in-memory only — not shared across uvicorn workers).
-# If running with --workers > 1 in future, replace with Redis or Supabase-backed caching.
-cache = TTLCache(maxsize=1, ttl=60)
-
 @router.get("", response_model=dict[str, int])
-@cached(cache)
 def get_stats():
     """
-    Returns live registry statistics. Cached for 60 seconds.
+    Returns live registry statistics.
     """
     supabase = get_service_supabase()
     
@@ -26,7 +20,7 @@ def get_stats():
         registered_dogs = dogs_res.count if dogs_res.count is not None else 0
         
         # Count of matches made
-        matches_res = supabase.table("scan_logs").select("id", count="exact").not_("matched_dog_id", "is", "null").limit(1).execute()
+        matches_res = supabase.table("scan_logs").select("id", count="exact").filter("matched_dog_id", "not.is", "null").limit(1).execute()
         matches_made = matches_res.count if matches_res.count is not None else 0
         
         # For reunites, we could just say it's proportional or the same as matches
