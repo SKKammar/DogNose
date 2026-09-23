@@ -88,6 +88,11 @@ export interface DogDetails {
   owner_email: string | null
   microchip_id: string | null
   notes: string | null
+  behaviour_notes?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_phone?: string | null
+  vet_name?: string | null
+  vet_phone?: string | null
 }
 
 /**

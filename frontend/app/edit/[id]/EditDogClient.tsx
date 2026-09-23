@@ -28,6 +28,11 @@ export default function EditDogClient({ id }: { id: string }) {
   const [ownerEmail, setOwnerEmail] = useState('')
   const [microchipId, setMicrochipId] = useState('')
   const [notes, setNotes] = useState('')
+  const [behaviourNotes, setBehaviourNotes] = useState('')
+  const [emergencyName, setEmergencyName] = useState('')
+  const [emergencyPhone, setEmergencyPhone] = useState('')
+  const [vetName, setVetName] = useState('')
+  const [vetPhone, setVetPhone] = useState('')
 
   useEffect(() => {
     const fetchDog = async () => {
@@ -42,6 +47,11 @@ export default function EditDogClient({ id }: { id: string }) {
         setOwnerName(dog.owner_name || ''); setOwnerPhone(dog.owner_phone || '')
         setOwnerEmail(dog.owner_email || ''); setMicrochipId(dog.microchip_id || '')
         setNotes(dog.notes || '')
+        setBehaviourNotes(dog.behaviour_notes || '')
+        setEmergencyName(dog.emergency_contact_name || '')
+        setEmergencyPhone(dog.emergency_contact_phone || '')
+        setVetName(dog.vet_name || '')
+        setVetPhone(dog.vet_phone || '')
       } catch (err) {
         setError(err)
         toast.error('Failed to load dog profile')
@@ -61,7 +71,12 @@ export default function EditDogClient({ id }: { id: string }) {
         name, breed: breed || null, age: age === '' ? null : Number(age), sex,
         color_markings: colorMarkings || null, owner_name: ownerName || null,
         owner_phone: ownerPhone || null, owner_email: ownerEmail || null,
-        microchip_id: microchipId || null, notes: notes || null
+        microchip_id: microchipId || null, notes: notes || null,
+        behaviour_notes: behaviourNotes || null,
+        emergency_contact_name: emergencyName || null,
+        emergency_contact_phone: emergencyPhone || null,
+        vet_name: vetName || null,
+        vet_phone: vetPhone || null,
       }, sessionToken)
       toast.success('SYS_UPDATE_OK')
       router.push('/dashboard')
@@ -182,6 +197,72 @@ export default function EditDogClient({ id }: { id: string }) {
               <div>
                 <label className="field-label">Notes</label>
                 <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="input-base resize-none" placeholder="Medical conditions, distinct behavior..." />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-surface border border-border p-8 shadow-brutalist space-y-6 pt-4 mt-6">
+            <h3 className="text-xs font-mono font-bold text-text-muted uppercase tracking-widest border-b border-border pb-4">
+              Emergency &amp; Behaviour
+            </h3>
+
+            <div className="space-y-1">
+              <label className="field-label">Behaviour Notes</label>
+              <textarea
+                value={behaviourNotes}
+                onChange={e => setBehaviourNotes(e.target.value)}
+                rows={3}
+                className="input-base resize-none"
+                placeholder="e.g. Friendly, but nervous around loud noises. Do not let him off-leash."
+              />
+              <p className="text-xs text-text-muted">
+                Shown to anyone who finds your dog.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="field-label">Emergency Contact Name</label>
+                <input
+                  type="text"
+                  value={emergencyName}
+                  onChange={e => setEmergencyName(e.target.value)}
+                  className="input-base"
+                  placeholder="e.g. Michael Chen"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="field-label">Emergency Phone</label>
+                <input
+                  type="tel"
+                  value={emergencyPhone}
+                  onChange={e => setEmergencyPhone(e.target.value)}
+                  className="input-base"
+                  placeholder="+1 (555) 987-6543"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="field-label">Vet Name</label>
+                <input
+                  type="text"
+                  value={vetName}
+                  onChange={e => setVetName(e.target.value)}
+                  className="input-base"
+                  placeholder="e.g. Riverside Animal Hospital"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="field-label">Vet Phone</label>
+                <input
+                  type="tel"
+                  value={vetPhone}
+                  onChange={e => setVetPhone(e.target.value)}
+                  className="input-base"
+                  placeholder="+1 (555) 222-3333"
+                />
               </div>
             </div>
           </div>

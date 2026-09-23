@@ -25,6 +25,11 @@ CREATE TABLE dognose.dogs (
     profile_photo_url   text,
     nose_embedding      vector(1536),
     embedding_version   text DEFAULT 'dognose-v2-finetuned',
+    behaviour_notes          text,
+    emergency_contact_name   text,
+    emergency_contact_phone  text,
+    vet_name                 text,
+    vet_phone                text,
     created_at          timestamptz DEFAULT now()
 );
 
@@ -78,31 +83,30 @@ CREATE OR REPLACE FUNCTION dognose.match_all_dogs(
     p_embedding_version text
 )
 RETURNS TABLE (
-    dog_id              uuid,
-    name                text,
-    breed               text,
-    age                 double precision,
-    sex                 text,
-    color_markings      text,
-    owner_name          text,
-    owner_phone         text,
-    owner_email         text,
-    profile_photo_url   text,
-    similarity          double precision
+    dog_id                  uuid,
+    name                    text,
+    breed                   text,
+    age                     double precision,
+    sex                     text,
+    color_markings          text,
+    owner_name              text,
+    owner_phone             text,
+    owner_email             text,
+    profile_photo_url       text,
+    behaviour_notes         text,
+    emergency_contact_name  text,
+    emergency_contact_phone text,
+    vet_name                text,
+    vet_phone               text,
+    similarity              double precision
 )
 LANGUAGE sql STABLE
 AS $$
     SELECT
-        id              AS dog_id,
-        name,
-        breed,
-        age,
-        sex,
-        color_markings,
-        owner_name,
-        owner_phone,
-        owner_email,
-        profile_photo_url,
+        id, name, breed, age, sex, color_markings,
+        owner_name, owner_phone, owner_email, profile_photo_url,
+        behaviour_notes, emergency_contact_name, emergency_contact_phone,
+        vet_name, vet_phone,
         1 - (nose_embedding <=> query_embedding) AS similarity
     FROM dognose.dogs
     WHERE

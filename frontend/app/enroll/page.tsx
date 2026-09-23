@@ -33,6 +33,11 @@ export default function EnrollPage() {
   const [ownerEmail, setOwnerEmail] = useState('')
   const [microchipId, setMicrochipId] = useState('')
   const [notes, setNotes] = useState('')
+  const [behaviourNotes, setBehaviourNotes] = useState('')
+  const [emergencyName, setEmergencyName] = useState('')
+  const [emergencyPhone, setEmergencyPhone] = useState('')
+  const [vetName, setVetName] = useState('')
+  const [vetPhone, setVetPhone] = useState('')
   const [showOwner, setShowOwner] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
   const [enrolledDogName, setEnrolledDogName] = useState('')
@@ -80,7 +85,12 @@ export default function EnrollPage() {
           name, breed: breed || null, age: age === '' ? null : Number(age), sex,
           color_markings: colorMarkings || null, owner_name: ownerName || null,
           owner_phone: ownerPhone || null, owner_email: ownerEmail || null,
-          microchip_id: microchipId || null, notes: notes || null
+          microchip_id: microchipId || null, notes: notes || null,
+          behaviour_notes: behaviourNotes || null,
+          emergency_contact_name: emergencyName || null,
+          emergency_contact_phone: emergencyPhone || null,
+          vet_name: vetName || null,
+          vet_phone: vetPhone || null,
         }, token), setIsWakingUp)
         id = dogData.id
         setDogId(id)
@@ -117,6 +127,7 @@ export default function EnrollPage() {
     setStep('details'); setName(''); setBreed(''); setAge(''); setSex('Unknown')
     setColorMarkings(''); setOwnerName(''); setOwnerPhone(''); setOwnerEmail('')
     setMicrochipId(''); setNotes(''); setShowOwner(false); setPhotos([]); setEnrolledDogName('')
+    setBehaviourNotes(''); setEmergencyName(''); setEmergencyPhone(''); setVetName(''); setVetPhone('')
     setDogId(null)
   }
 
@@ -236,6 +247,56 @@ export default function EnrollPage() {
                           <div>
                             <label className="field-label">Supplementary Data</label>
                             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="input-base resize-none" placeholder="Medical conditions, distinct behavior..." />
+                          </div>
+                          <div>
+                            <label className="field-label">Behaviour Notes (shown to finders)</label>
+                            <textarea
+                              value={behaviourNotes}
+                              onChange={e => setBehaviourNotes(e.target.value)}
+                              rows={2}
+                              className="input-base resize-none"
+                              placeholder="e.g. Friendly, but nervous around loud noises"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="field-label">Emergency Name</label>
+                              <input
+                                type="text"
+                                value={emergencyName}
+                                onChange={e => setEmergencyName(e.target.value)}
+                                className="input-base"
+                              />
+                            </div>
+                            <div>
+                              <label className="field-label">Emergency Phone</label>
+                              <input
+                                type="tel"
+                                value={emergencyPhone}
+                                onChange={e => setEmergencyPhone(e.target.value)}
+                                className="input-base"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="field-label">Vet Name</label>
+                              <input
+                                type="text"
+                                value={vetName}
+                                onChange={e => setVetName(e.target.value)}
+                                className="input-base"
+                              />
+                            </div>
+                            <div>
+                              <label className="field-label">Vet Phone</label>
+                              <input
+                                type="tel"
+                                value={vetPhone}
+                                onChange={e => setVetPhone(e.target.value)}
+                                className="input-base"
+                              />
+                            </div>
                           </div>
                         </div>
                       </motion.div>

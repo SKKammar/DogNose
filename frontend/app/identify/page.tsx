@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
 import CameraCapture from '../components/CameraCapture'
-import { Loader2, Phone, Mail, Copy, ScanFace, ArrowRight, Info, AlertTriangle } from 'lucide-react'
+import { Loader2, Phone, Mail, Copy, ScanFace, ArrowRight, Info, AlertTriangle, ChevronDown, PawPrint, Camera } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { identifyNose, callWithWakeUp, API_URL } from '../../lib/api'
@@ -23,12 +23,22 @@ interface MatchCandidate {
   owner_email?: string
   profile_photo_url?: string
   microchip_id?: string
+  behaviour_notes?: string
+  emergency_contact_name?: string
+  emergency_contact_phone?: string
+  vet_name?: string
+  vet_phone?: string
   similarity: number
   is_match: boolean
 }
 
-interface IdentifyHealth {
-  allergies: { allergen: string; severity?: 'mild' | 'moderate' | 'severe' | null }[]
+interface HealthAllergy {
+  allergen: string
+  severity?: 'mild' | 'moderate' | 'severe' | null
+}
+
+interface HealthInfo {
+  allergies: HealthAllergy[]
   vaccination_status: 'up_to_date' | 'overdue' | 'unknown'
   last_weight_kg: number | null
 }
@@ -40,7 +50,7 @@ interface IdentifyResult {
   confidence?: number
   confidence_pct?: string
   dog?: MatchCandidate
-  health?: IdentifyHealth
+  health?: HealthInfo
   error?: boolean
   code?: string
 }
@@ -65,6 +75,7 @@ export default function IdentifyPage() {
   const [validationError, setValidationError] = useState<{ icon: string; title: string; hint: string } | null>(null)
   const [processingStep, setProcessingStep] = useState(0)
   const [isWaking, setIsWaking] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
   const [stats, setStats] = useState({ registered_dogs: 0 })
   const stepTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -112,6 +123,36 @@ export default function IdentifyPage() {
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(() => toast.success(`${label} COPIED TO CLIPBOARD`))
+  }
+
+  const handleCopy = () => {
+    if (!result?.dog) return
+    const d = result.dog
+    const h = result.health
+    const allergyLine = h?.allergies?.length
+      ? h.allergies
+          .map(a => `${a.allergen}${a.severity ? ` (${a.severity})` : ''}`)
+          .join(', ')
+      : null
+    const lines = [
+      `Dog: ${d.name}`,
+      d.breed && `Breed: ${d.breed}`,
+      d.age && `Age: ${d.age} yrs`,
+      d.sex && `Sex: ${d.sex}`,
+      d.color_markings && `Colour: ${d.color_markings}`,
+      allergyLine && `Allergies: ${allergyLine}`,
+      d.behaviour_notes && `Behaviour: ${d.behaviour_notes}`,
+      `Owner: ${d.owner_name || 'Unknown'}`,
+      `Phone: ${d.owner_phone || 'N/A'}`,
+      d.emergency_contact_phone &&
+        `Emergency: ${[d.emergency_contact_name, d.emergency_contact_phone]
+          .filter(Boolean)
+          .join(' ')}`,
+      d.vet_phone &&
+        `Vet: ${[d.vet_name, d.vet_phone].filter(Boolean).join(' ')}`,
+    ].filter(Boolean)
+    navigator.clipboard.writeText(lines.join('\n'))
+    toast.success('Copied all details')
   }
 
   return (
@@ -186,137 +227,230 @@ export default function IdentifyPage() {
 
           {/* MATCH */}
           {status === 'match' && result?.dog && (
-            <motion.div key="match" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-              <div className="max-w-4xl mx-auto border border-border bg-surface flex flex-col md:flex-row shadow-brutalist overflow-hidden">
-                {/* Status Banner */}
-                <div className="bg-accent-green text-background p-8 flex flex-col justify-center items-start md:w-1/3">
-                  <span className="font-mono text-sm tracking-widest font-bold mb-4 uppercase">System Status</span>
-                  <h2 className="font-display text-4xl md:text-5xl font-bold leading-none tracking-tighter">POSITIVE MATCH</h2>
-                </div>
-                
-                {/* Data Block */}
-                <div className="p-8 md:w-2/3 flex flex-col gap-8 bg-background border-l border-border relative">
-                  {/* Photo Thumbnail */}
-                  {result.dog.profile_photo_url && (
-                    <div className="absolute top-8 right-8 w-20 h-20 border border-border grayscale overflow-hidden hidden sm:block">
-                      <img src={result.dog.profile_photo_url} alt="Profile" className="w-full h-full object-cover" />
-                    </div>
-                  )}
+  <motion.div
+    key="match"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="w-full max-w-md mx-auto relative z-10"
+  >
+    {/* Top status bar */}
+    <div className="flex items-center justify-between mb-4 px-1">
+      <div className="flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-accent-green" />
+        <span className="text-xs font-mono uppercase tracking-wider text-accent-green font-bold">
+          Match found
+        </span>
+      </div>
+      {typeof result.dog.similarity === 'number' && (
+        <span className="text-[11px] font-mono uppercase tracking-wider text-text-muted">
+          {Math.round(result.dog.similarity * 100)}%
+        </span>
+      )}
+    </div>
 
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-6 font-mono text-sm">
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-text-muted text-xs uppercase tracking-widest">Similarity Index</span>
-                      <span className="text-accent-green font-bold text-xl">
-                        {result.confidence_pct || `${((result.confidence || 0) * 100).toFixed(2)}%`}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-text-muted text-xs uppercase tracking-widest">Subject ID</span>
-                      <span className="text-text-primary">{result.dog.dog_id.substring(0, 12).toUpperCase()}</span>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-text-muted text-xs uppercase tracking-widest">Subject Name</span>
-                      <span className="text-text-primary font-sans text-lg font-semibold">{result.dog.name}</span>
-                    </div>
-                    {result.dog.breed && (
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-text-muted text-xs uppercase tracking-widest">Classification</span>
-                        <span className="text-text-primary font-sans">{result.dog.breed}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Health summary */}
-                  {result.health && (
-                    <div className="px-6 pb-6 border-b border-border">
-                      <p className="text-sm font-semibold text-text-primary mb-3">
-                        Health
-                      </p>
-
-                      {result.health.allergies.length > 0 && (
-                        <div className="mb-3 space-y-1.5">
-                          {result.health.allergies.map((a, i) => {
-                            const tone =
-                              a.severity === 'severe'
-                                ? 'bg-accent-red/10 border-accent-red text-accent-red'
-                                : a.severity === 'moderate'
-                                ? 'bg-accent-amber/10 border-accent-amber text-accent-amber'
-                                : 'bg-surface border-border text-text-secondary'
-                            return (
-                              <div
-                                key={i}
-                                className={`flex items-center gap-2 px-3 py-2 rounded border text-xs ${tone}`}
-                              >
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                <span className="font-medium">Allergic to:</span>
-                                <span className="font-mono">{a.allergen}</span>
-                                {a.severity && (
-                                  <span className="ml-auto font-mono uppercase text-[10px] tracking-wider opacity-80">
-                                    {a.severity}
-                                  </span>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      <div className="flex flex-wrap gap-2">
-                        {result.health.vaccination_status !== 'unknown' && (
-                          <span
-                            className={`badge-outline ${
-                              result.health.vaccination_status === 'overdue'
-                                ? 'text-accent-amber border-accent-amber'
-                                : 'text-accent-green border-accent-green'
-                            }`}
-                          >
-                            {result.health.vaccination_status === 'overdue'
-                              ? 'Vaccinations overdue'
-                              : 'Vaccinations up to date'}
-                          </span>
-                        )}
-
-                        {result.health.last_weight_kg != null && (
-                          <span className="badge-outline text-text-secondary border-border">
-                            {result.health.last_weight_kg} kg
-                          </span>
-                        )}
-                      </div>
-
-                      {result.health.allergies.length === 0 &&
-                       result.health.vaccination_status === 'unknown' &&
-                       result.health.last_weight_kg == null && (
-                        <p className="text-xs text-text-muted">
-                          No health records on file.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Owner Contact */}
-                  {(result.dog.owner_name || result.dog.owner_phone || result.dog.owner_email) && (
-                    <div className="border-t border-border pt-6 mt-2">
-                      <span className="text-text-muted text-xs uppercase tracking-widest mb-4 block">Primary Contact</span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans text-sm text-text-primary">
-                        {result.dog.owner_name && <div>{result.dog.owner_name}</div>}
-                        {result.dog.owner_phone && (
-                          <div className="flex items-center justify-between border border-border bg-surface px-3 py-2">
-                            <span className="flex items-center gap-2 font-mono"><Phone size={14} className="text-text-muted" /> {result.dog.owner_phone}</span>
-                            <button onClick={() => copyToClipboard(result.dog!.owner_phone!, 'Phone')} className="text-accent-blue hover:text-[#3B82F6]"><Copy size={14} /></button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="border-t border-border pt-6 flex flex-col sm:flex-row gap-4 mt-auto">
-                    <button onClick={reset} className="btn-ghost flex-1 py-3 text-sm tracking-wide">INITIALIZE NEW SCAN</button>
-                    {/* Note: /dogs/[id] is currently unimplemented on the backend per earlier logs, so we will not display a broken link */}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+    <div className="bg-surface border border-border rounded overflow-hidden">
+      {/* Hero — photo + basics */}
+      <div className="p-6 flex gap-5 items-start border-b border-border">
+        <div className="w-24 h-24 rounded overflow-hidden bg-background border border-border shrink-0 flex items-center justify-center">
+          {result.dog.profile_photo_url ? (
+            <img
+              src={result.dog.profile_photo_url}
+              alt={result.dog.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <PawPrint className="w-8 h-8 text-text-muted" />
           )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-3xl font-display font-bold text-text-primary leading-none mb-2">
+            {result.dog.name}
+          </h2>
+          <p className="text-sm text-text-secondary mb-1">
+            {[result.dog.breed, result.dog.age && `${result.dog.age} yrs`, result.dog.sex]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+          {result.dog.color_markings && (
+            <p className="text-xs text-text-muted">{result.dog.color_markings}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Health flags */}
+      {result.health &&
+        (result.health.allergies.length > 0 ||
+          result.health.vaccination_status !== 'unknown' ||
+          result.health.last_weight_kg != null) && (
+          <div className="p-6 border-b border-border space-y-3">
+            <p className="field-label">Take care</p>
+
+            {result.health.allergies.map((a, i) => {
+              const severe = a.severity === 'severe'
+              const moderate = a.severity === 'moderate'
+              const tone = severe
+                ? 'bg-accent-red text-background border-accent-red'
+                : moderate
+                ? 'bg-[#FBBF24] text-background border-[#FBBF24]'
+                : 'bg-surface text-text-secondary border-border'
+              return (
+                <div
+                  key={i}
+                  className={`flex items-center gap-3 px-4 py-3 rounded border font-mono text-xs font-bold uppercase tracking-tight overflow-hidden ${tone}`}
+                >
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span className="shrink-0">
+                    {severe ? 'Severe allergy' : moderate ? 'Allergy' : 'Mild allergy'}
+                  </span>
+                  <span className="ml-auto truncate">{a.allergen}</span>
+                </div>
+              )
+            })}
+
+            <div className="flex flex-wrap gap-2">
+              {result.health.vaccination_status !== 'unknown' && (
+                <span
+                  className={`badge ${
+                    result.health.vaccination_status === 'overdue'
+                      ? 'bg-[#FBBF24] text-background'
+                      : 'bg-accent-green text-background'
+                  }`}
+                >
+                  {result.health.vaccination_status === 'overdue'
+                    ? 'Vaccines overdue'
+                    : 'Vaccines up to date'}
+                </span>
+              )}
+              {result.health.last_weight_kg != null && (
+                <span className="badge bg-surface text-text-secondary border border-border px-2 py-1">
+                  {result.health.last_weight_kg} kg
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+      {/* Behaviour */}
+      {result.dog.behaviour_notes && (
+        <div className="p-6 border-b border-border">
+          <p className="field-label">Behaviour</p>
+          <p className="text-sm text-text-secondary leading-relaxed line-clamp-3">
+            {result.dog.behaviour_notes}
+          </p>
+        </div>
+      )}
+
+      {/* Contact */}
+      <div className="p-6 border-b border-border">
+        <p className="field-label">Contact the owner</p>
+
+        <div className="border border-border rounded overflow-hidden mb-3">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 bg-background">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-text-primary truncate">
+                {result.dog.owner_name || 'Owner'}
+              </p>
+              <p className="text-xs text-text-muted font-mono mt-0.5">
+                {result.dog.owner_phone || 'No phone on file'}
+              </p>
+            </div>
+            {result.dog.owner_phone ? (
+              <a
+                href={`tel:${result.dog.owner_phone}`}
+                className="btn-primary text-xs px-4 py-2 shrink-0 flex items-center gap-1"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                Call
+              </a>
+            ) : result.dog.emergency_contact_phone ? (
+              <a
+                href={`tel:${result.dog.emergency_contact_phone}`}
+                className="btn-primary text-xs px-4 py-2 shrink-0 flex items-center gap-1"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                Emergency
+              </a>
+            ) : null}
+          </div>
+        </div>
+
+        {(result.dog.emergency_contact_phone || result.dog.vet_phone) && (
+          <details className="group border border-border rounded overflow-hidden">
+            <summary className="px-4 py-3 cursor-pointer text-xs font-mono uppercase tracking-wider text-text-muted hover:text-text-primary transition-colors flex items-center justify-between list-none">
+              <span>Backup contacts</span>
+              <ChevronDown className="w-4 h-4 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="border-t border-border divide-y divide-border">
+              {result.dog.emergency_contact_phone && (
+                <a
+                  href={`tel:${result.dog.emergency_contact_phone}`}
+                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs uppercase tracking-wider text-text-muted font-mono mb-0.5">
+                      Emergency
+                    </p>
+                    <p className="text-sm text-text-primary truncate">
+                      {result.dog.emergency_contact_name || 'Emergency contact'}
+                    </p>
+                    <p className="text-xs text-text-muted font-mono">
+                      {result.dog.emergency_contact_phone}
+                    </p>
+                  </div>
+                  <Phone className="w-4 h-4 text-text-muted shrink-0" />
+                </a>
+              )}
+              {result.dog.vet_phone && (
+                <a
+                  href={`tel:${result.dog.vet_phone}`}
+                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs uppercase tracking-wider text-text-muted font-mono mb-0.5">
+                      Vet
+                    </p>
+                    <p className="text-sm text-text-primary truncate">
+                      {result.dog.vet_name || 'Veterinarian'}
+                    </p>
+                    <p className="text-xs text-text-muted font-mono">
+                      {result.dog.vet_phone}
+                    </p>
+                  </div>
+                  <Phone className="w-4 h-4 text-text-muted shrink-0" />
+                </a>
+              )}
+            </div>
+          </details>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="p-6 flex flex-col gap-3 bg-background">
+        <button
+          onClick={handleCopy}
+          className="btn-ghost w-full justify-center flex items-center gap-2"
+        >
+          <Copy className="w-4 h-4" />
+          Copy all details
+        </button>
+        <button
+          onClick={reset}
+          className="btn-primary w-full justify-center flex items-center gap-2"
+        >
+          <Camera className="w-4 h-4" />
+          Scan another dog
+        </button>
+      </div>
+    </div>
+
+    <button
+      onClick={() => setShowReportModal(true)}
+      className="mt-4 w-full text-center text-xs text-text-muted underline hover:text-text-secondary transition-colors"
+    >
+      Report this match as incorrect
+    </button>
+  </motion.div>
+)}
 
           {/* NO MATCH */}
           {status === 'no_match' && (

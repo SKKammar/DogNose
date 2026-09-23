@@ -48,6 +48,11 @@ class DogCreate(BaseModel):
     microchip_id: str | None = None
     notes: str | None = None
     profile_photo_url: str | None = None
+    behaviour_notes: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    vet_name: str | None = None
+    vet_phone: str | None = None
 
 
 class DogUpdate(BaseModel):
@@ -62,6 +67,11 @@ class DogUpdate(BaseModel):
     microchip_id: str | None = None
     notes: str | None = None
     profile_photo_url: str | None = None
+    behaviour_notes: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    vet_name: str | None = None
+    vet_phone: str | None = None
 
 
 class DogResponse(BaseModel):
@@ -79,6 +89,11 @@ class DogResponse(BaseModel):
     microchip_id: str | None = None
     notes: str | None = None
     profile_photo_url: str | None = None
+    behaviour_notes: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    vet_name: str | None = None
+    vet_phone: str | None = None
     created_at: str | None = None
 
 
@@ -102,6 +117,11 @@ class MatchCandidate(BaseModel):
     owner_phone: str | None = None
     owner_email: str | None = None
     profile_photo_url: str | None = None
+    behaviour_notes: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    vet_name: str | None = None
+    vet_phone: str | None = None
     similarity: float
     is_match: bool
 
@@ -111,6 +131,7 @@ class IdentifyResponse(BaseModel):
     message: str
     confidence: float | None = None
     dog: MatchCandidate | None = None
+    health: dict | None = None
 
 
 # --- Image validation helper ---
@@ -156,6 +177,11 @@ def register_dog(
         "microchip_id": dog.microchip_id,
         "notes": dog.notes,
         "profile_photo_url": dog.profile_photo_url,
+        "behaviour_notes": dog.behaviour_notes,
+        "emergency_contact_name": dog.emergency_contact_name,
+        "emergency_contact_phone": dog.emergency_contact_phone,
+        "vet_name": dog.vet_name,
+        "vet_phone": dog.vet_phone,
     }
 
     res = supabase.table("dogs").insert(data).execute()
@@ -481,6 +507,11 @@ def identify_dog(
             owner_phone=row.get("owner_phone"),
             owner_email=row.get("owner_email"),
             profile_photo_url=row.get("profile_photo_url"),
+            behaviour_notes=row.get("behaviour_notes"),
+            emergency_contact_name=row.get("emergency_contact_name"),
+            emergency_contact_phone=row.get("emergency_contact_phone"),
+            vet_name=row.get("vet_name"),
+            vet_phone=row.get("vet_phone"),
             similarity=round(float(row["similarity"]), 4),
             is_match=False, # We will set this manually below based on threshold + margin
         )
@@ -577,7 +608,7 @@ def identify_dog(
         if w_res.data:
             health["last_weight_kg"] = w_res.data[0]["weight_kg"]
     except Exception as e:
-        logger.warning(f"Health summary lookup failed: {e}")
+        logger.warning(f"Health summary lookup failed for {matches[0].dog_id}: {e}")
         # health stays at defaults — do not fail the match
 
     return {
