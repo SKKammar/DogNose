@@ -9,6 +9,8 @@ DoGNose is a biometric identification system that acts like a fingerprint scanne
 ## 🌟 Features
 - **Biometric Enrollment:** Capture and enroll 5 high-quality nose prints per dog to create a robust biometric profile.
 - **Fast Identification:** Search for a dog in real-time by taking a photo of their nose, utilizing highly optimized vector similarity search with pgvector.
+- **Comprehensive Health Records:** Store and track allergies, vaccinations, medications, weight logs, and vet visits.
+- **Emergency Contacts & Behaviour:** Keep critical emergency and vet contact information, alongside behaviour notes that are shown immediately upon identification.
 - **Robust ML Pipeline:** Two-stage object detection (Dog -> Nose) followed by a state-of-the-art fine-tuned embedding network.
 - **Progressive Web App (PWA):** Works seamlessly on mobile devices with native camera integration.
 
@@ -32,8 +34,9 @@ The identification system relies on a sequence of models to isolate and embed th
 The project uses a custom schema `dognose` to isolate its tables from the default `public` schema.
 
 ### Tables
-- `dognose.dogs`: Stores dog metadata (name, breed, owner details) and the `1536-dim` vector `nose_embedding`.
+- `dognose.dogs`: Stores dog metadata (name, breed, owner details, emergency contacts, behaviour notes) and the `1536-dim` vector `nose_embedding`.
 - `dognose.scan_logs`: Tracks successful identification matches.
+- **Health Tables:** `allergies`, `vaccinations`, `medications`, `visits`, `weight_logs` store detailed health profiles.
 
 ### Security & Permissions
 Row Level Security (RLS) is used extensively. To allow the API to function, you **must** grant usage privileges to the Supabase roles on the custom schema:
@@ -243,6 +246,11 @@ owner_name text
 owner_phone text
 owner_email text
 profile_photo_url text
+behaviour_notes text
+emergency_contact_name text
+emergency_contact_phone text
+vet_name text
+vet_phone text
 nose_embedding vector(1536)          -- renamed from "embedding"
 embedding_version text               -- 'dognose-v2-finetuned'
 
@@ -262,7 +270,9 @@ dognose.match_all_dogs(
 RETURNS TABLE (
     dog_id uuid, name text, breed text, age double precision,
     sex text, color_markings text, owner_name text, owner_phone text,
-    owner_email text, profile_photo_url text, similarity double precision
+    owner_email text, profile_photo_url text, behaviour_notes text,
+    emergency_contact_name text, emergency_contact_phone text,
+    vet_name text, vet_phone text, similarity double precision
 )
 ```
 References `nose_embedding` throughout. Filters by `embedding_version = p_embedding_version`.
@@ -434,9 +444,10 @@ The real-world scores are **higher than the val set average** — the model gene
 | Threshold calibration | ✅ Complete (0.56 / 0.08) |
 | Backend integration | ✅ Complete |
 | Database migration | ✅ Complete |
-| Real-world testing | 🟢 2/3 passed, rejection test pending |
-| **System status** | **Operational, awaiting final validation** |
+| Real-world testing | ✅ 3/3 passed (Same-dog, Cross-dog, Unenrolled-dog) |
+| Health & Emergency Info | ✅ Complete |
+| **System status** | **Operational and fully validated** |
 
 **You went from a broken chance-level model to a working biometric identification system with near-perfect (>0.97) confidence on real-world enrolled dogs — in a single session.**
 
-The DoGNose system is deployed, functional, and validated. The only remaining task is confirming it correctly *rejects* an unenrolled dog, which is the natural next step whenever you're ready to test.
+The DoGNose system is deployed, functional, and fully validated. It now also serves as a comprehensive health and safety registry for pets.

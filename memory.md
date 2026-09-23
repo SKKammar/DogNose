@@ -62,7 +62,9 @@ User Action (Upload Photo) ──▶ Frontend ──▶ API (`POST /dogs/identif
 - **User Authentication:** Login/Signup via Supabase.
 - **Dog Registration:** Creating a profile for a dog.
 - **Nose Print Enrollment:** Extracting and storing a biometric signature from an image.
-- **Dog Identification:** Uploading an image to find the matching dog profile based on similarity threshold (>0.65).
+- **Dog Identification:** Uploading an image to find the matching dog profile based on similarity threshold (>0.56).
+- **Comprehensive Health Records:** Tracking allergies, vaccinations, medications, visits, and weight logs.
+- **Emergency & Behaviour Safety:** Displaying critical owner contacts, vet info, and behaviour warnings instantly upon identifying a lost dog.
 
 ## Performance Notes
 - **Inference Limitations:** Model inference is performed synchronously on the backend CPU (via ONNXRuntime). Heavy concurrent usage might require migrating to asynchronous background workers (e.g., Celery) or GPU-backed instances.
